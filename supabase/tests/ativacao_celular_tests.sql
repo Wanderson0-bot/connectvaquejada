@@ -8,6 +8,7 @@ declare
   sem_acesso uuid := gen_random_uuid();
   sessao uuid := gen_random_uuid();
   outra_sessao uuid := gen_random_uuid();
+  sessao_reuso uuid := gen_random_uuid();
   parque uuid := gen_random_uuid();
   evento uuid := gen_random_uuid();
   outro_evento uuid := gen_random_uuid();
@@ -15,6 +16,8 @@ declare
   expirado text;
   resposta jsonb;
   dispositivo uuid;
+  convite_celular text;
+  celular uuid;
 begin
   insert into auth.users(id,aud,role,email,raw_app_meta_data,raw_user_meta_data,is_anonymous)
   values
@@ -22,7 +25,8 @@ begin
     (operador,'authenticated','authenticated',operador||'@example.invalid','{}','{}',false),
     (sem_acesso,'authenticated','authenticated',sem_acesso||'@example.invalid','{}','{}',false),
     (sessao,'authenticated','authenticated',null,'{}','{}',true),
-    (outra_sessao,'authenticated','authenticated',null,'{}','{}',true);
+    (outra_sessao,'authenticated','authenticated',null,'{}','{}',true),
+    (sessao_reuso,'authenticated','authenticated',null,'{}','{}',true);
   insert into public.parques(id,nome) values(parque,'Parque de teste');
   insert into public.perfis(id,parque_id,nome) values
     (organizador,parque,'Organizador'),(operador,parque,'Operador'),(sem_acesso,parque,'Sem acesso');
@@ -98,6 +102,29 @@ begin
   perform public.pista_ops_configurar_membro(evento,operador,'escritorio',false);
   if (select estado from public.pista_ops_devices where id=dispositivo) is distinct from 'revogado' then
     raise exception 'Revogação da função não encerrou o aparelho';
+  end if;
+  select c.codigo into convite_celular from public.pista_ops_mobile_code_create(evento,'locutor') c;
+  if public.pista_ops_mobile_redeem(convite_celular,null)->>'erro' is distinct from 'sessao' then
+    raise exception 'O resgate deve usar a sessão do próprio aparelho';
+  end if;
+  perform set_config('request.jwt.claims',json_build_object('sub',outra_sessao,'is_anonymous',true)::text,true);
+  resposta := public.pista_ops_mobile_redeem(convite_celular,null);
+  celular := (resposta->>'id')::uuid;
+  if celular is null or not exists (
+    select 1 from public.pista_ops_devices where id=celular and usuario_auth_id=outra_sessao
+      and nome='Celular de operação' and operador_conta_id is null and ativado_por_codigo
+  ) then raise exception 'Vínculo por código não foi salvo com o nome padrão'; end if;
+  if not public.pista_ops_mobile_touch(evento,'locutor')
+    or public.pista_ops_mobile_touch(evento,'escritorio')
+    or public.pista_ops_mobile_touch(outro_evento,'locutor') then
+    raise exception 'Escopo inválido para aparelho vinculado por código';
+  end if;
+  if not public.pista_ops_mobile_sair() or public.pista_ops_mobile_touch(evento,'locutor') then
+    raise exception 'Sessão vinculada por código continuou ativa após sair';
+  end if;
+  perform set_config('request.jwt.claims',json_build_object('sub',sessao_reuso,'is_anonymous',true)::text,true);
+  if public.pista_ops_mobile_redeem(convite_celular,'Outro celular')->>'erro' is distinct from 'codigo' then
+    raise exception 'Código usado foi aceito novamente';
   end if;
   raise notice 'Ativação, escopo, bloqueio e revogação verificados.';
 end;

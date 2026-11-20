@@ -21,14 +21,14 @@ O aplicativo Windows usa Electron e executa o servidor Next.js em `127.0.0.1`. A
 
 As tabelas existentes incluem `eventos`, `categorias`, `competidores`, `duplas`, `pista_ops_members`, `pista_ops_runs`, `x1_bois`, `pista_ops_device_codes` e `pista_ops_devices`. As permissões operacionais reutilizam RLS e as funções do banco. A central BOI TV já usa atualizações por eventos de servidor, com atualização periódica em caso de indisponibilidade.
 
-Antes desta mudança, a posse do código bastava para vincular um dispositivo e o banco armazenava o código em texto simples. Os novos convites exigem credenciais de uma conta com função autorizada no evento. O banco guarda apenas o hash do convite, consome-o em transação única e limita a dez tentativas por conta em dez minutos. A conta fica registrada para auditoria. A sessão no aparelho usa uma identidade separada, limitada a um evento e a uma função.
+O organizador entra no painel e gera um código de uso único para o evento e a função. O aparelho usa o código para criar uma sessão própria. O banco guarda apenas o hash do convite e confirma o vínculo e o consumo do código na mesma transação.
 
-As migrações preservam vínculos existentes e as RPCs usadas pelo instalador anterior. Convites antigos de 12 caracteres precisam ser substituídos para uso pela nova página de ativação. Escritório e locução por dispositivo continuam disponíveis nas operações temporárias. Na central BOI TV, o vínculo autenticado exige uma conta de organizador no evento, pois o modelo existente não possui uma função de membro BOI TV.
+As migrações preservam vínculos existentes e as RPCs usadas pelo instalador anterior. Convites antigos de 12 caracteres precisam ser substituídos para uso pela nova página de ativação. Escritório e locução por dispositivo continuam disponíveis nas operações temporárias. Para BOI TV, o convite precisa ser gerado pelo organizador com a central habilitada no evento.
 
 ### Publicar uma versão de homologação
 
 1. Vincule o diretório a um projeto Vercel com o framework Next.js. Use as rotas nativas do App Router e mantenha o modo standalone reservado ao instalador.
-2. Em um Supabase de homologação com o esquema anterior aplicado, aplique `202611200001_ativacao_celular_autenticada.sql` e `202611200002_autoria_e_concorrencia_celular.sql`, nessa ordem. Mantenha o login por email e senha e a opção de login anônimo do Supabase Auth para as sessões de aparelho.
+2. Em um Supabase de homologação com o esquema anterior aplicado, aplique `202611200001_ativacao_celular_autenticada.sql`, `202611200002_autoria_e_concorrencia_celular.sql` e `202611200003_ativacao_celular_por_codigo.sql`, nessa ordem. Mantenha o login por email e senha e a opção de login anônimo do Supabase Auth para as sessões de aparelho.
 3. Configure na Vercel a URL `NEXT_PUBLIC_SUPABASE_URL` e a chave pública `NEXT_PUBLIC_SUPABASE_ANON_KEY` do mesmo projeto Supabase usado no aplicativo Windows desse ambiente. O prazo é opcional em `DEVICE_ACTIVATION_TTL_MINUTES` e aceita de 1 a 60 minutos, com padrão de 10 minutos. A chave `service_role` não é necessária no aplicativo nem no build.
 4. Gere a implantação de homologação com `vercel deploy`. Confirme pelo navegador do celular que a URL HTTPS permite abrir `/` e `/ativar` sem uma conta Vercel. Quando houver domínio definitivo, configure-o como Site URL no Supabase Auth. Autorize somente URLs de retorno efetivamente usadas por convites de conta ou recuperação de senha. O login por senha e a ativação do aparelho já implementados não usam um redirecionamento do Supabase.
 5. Configure `DESKTOP_ACTIVATION_ORIGIN` no build Windows com a URL HTTPS verificada. Opcionalmente, configure `DEVICE_ACTIVATION_ORIGIN` na Vercel para usar um domínio canônico nos QR Codes gerados pela web.
@@ -38,9 +38,9 @@ As migrações preservam vínculos existentes e as RPCs usadas pelo instalador a
 ### Ativar, operar e revogar
 
 1. No painel Windows ou web, abra **Dispositivos → Conectar celular**, selecione uma operação ativa e gere o convite da função.
-2. Escaneie o QR Code no telefone e entre com a conta do operador. O código segue no fragmento do link e é enviado ao servidor somente no formulário de ativação. Mantenha a internet disponível durante operações de escrita.
-3. A conta pode operar inscrições, locução ou BOI TV conforme o vínculo. Use **Atualizar dados** para conferir alterações de outro aparelho. A central BOI TV mantém as atualizações automáticas que já existiam.
-4. Em **Dispositivos**, use **Bloquear** para suspender ou **Revogar** para encerrar o vínculo. A retirada da função do operador ou do organizador que concedeu o vínculo também encerra o acesso correspondente. O celular pode encerrar o próprio vínculo em **Sessão do aparelho**.
+2. Escaneie o QR Code no telefone ou digite o código na página de ativação. Se quiser, informe um nome para identificar o aparelho no painel. O código segue no fragmento do link e é enviado ao servidor somente no formulário de ativação. Mantenha a internet disponível durante operações de escrita.
+3. O aparelho pode operar inscrições, locução ou BOI TV conforme o vínculo. Use **Atualizar dados** para conferir alterações de outro aparelho. A central BOI TV mantém as atualizações automáticas que já existiam.
+4. Em **Dispositivos**, use **Bloquear** para suspender ou **Revogar** para encerrar o vínculo. A retirada da função do organizador que gerou o convite também encerra o acesso correspondente. O celular pode encerrar o próprio vínculo em **Sessão do aparelho**.
 
 ### Verificação
 

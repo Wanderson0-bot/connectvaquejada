@@ -1,11 +1,10 @@
-﻿import { createClient } from "@supabase/supabase-js";
-import { createServerClient } from "@supabase/ssr";
+﻿import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
 const messages: Record<string, [number, string]> = {
   codigo: [410, "Código de ativação inválido, expirado ou já utilizado. Peça outro ao organizador."],
   evento: [409, "O evento não está disponível para esta função."],
-  permissao: [403, "Sua conta não tem esta função no evento. Fale com o organizador."],
+  permissao: [403, "Este convite perdeu a autorização. Peça outro ao organizador."],
   limite: [429, "Muitas tentativas de ativação. Aguarde alguns minutos."],
 };
 
@@ -21,26 +20,13 @@ export async function POST(request: Request) {
 
   const dados = await request.json().catch(() => null);
   const codigo = typeof dados?.codigo === "string" ? dados.codigo.trim().toUpperCase() : "";
-  const email = typeof dados?.email === "string" ? dados.email.trim() : "";
-  const senha = typeof dados?.senha === "string" ? dados.senha : "";
-  const nome = (typeof dados?.nome === "string" ? dados.nome.trim() : "") || "Celular de operação";
-  if (!/^[0-9A-F]{32}$/.test(codigo) || !email || !senha || nome.length > 80) {
-    return falha("Informe o código, o email e a senha do operador.", 400);
+  const nome = typeof dados?.nome === "string" ? dados.nome.trim() : "";
+  if (!/^[0-9A-F]{32}$/.test(codigo) || nome.length > 80) {
+    return falha("Informe um código de ativação válido e use até 80 caracteres no nome do aparelho.", 400);
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  const conta = createClient(supabaseUrl, supabaseKey, {
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-  });
-  const { data: login, error: loginError } = await conta.auth.signInWithPassword({ email, password: senha });
-  if (loginError || !login.user || login.user.is_anonymous) {
-    if (loginError?.status === 429) return falha("Muitas tentativas de acesso. Aguarde e tente novamente.", 429);
-    if (loginError?.code === "email_not_confirmed") return falha("Confirme seu email antes de ativar.", 403);
-    if (loginError?.code === "invalid_credentials") return falha("Email ou senha não reconhecidos.", 401);
-    return falha("Não foi possível autenticar sua conta agora. Tente novamente.", 503);
-  }
-
   // Os cookies ficam em memória até a transação confirmar o vínculo.
   const staged: Array<() => void> = [];
   const store = await cookies();
@@ -59,8 +45,8 @@ export async function POST(request: Request) {
     return falha("Não foi possível criar a sessão do dispositivo agora.", sessaoError?.status === 429 ? 429 : 503);
   }
 
-  const { data, error } = await conta.rpc("pista_ops_mobile_activate", {
-    p_codigo: codigo, p_sessao: sessao.user.id, p_nome: nome,
+  const { data, error } = await dispositivo.rpc("pista_ops_mobile_redeem", {
+    p_codigo: codigo, p_nome: nome,
   });
   if (error) return falha("Não foi possível confirmar a ativação. Tente novamente.", 503);
   if (!data?.id) {
