@@ -1,0 +1,36 @@
+{
+  "name": "connect-vaquejada-desktop",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Connect Vaquejada para Windows",
+  "author": "Connect Vaquejada",
+  "main": "main.cjs",
+  "scripts": {
+    "package:win": "electron-builder --win nsis --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "45.4.1",
+    "electron-builder": "26.18.0"
+  },
+  "overrides": {
+    "semver@^5": "5.7.2"
+  },
+  "build": {
+    "appId": "br.connectvaquejada.desktop",
+    "productName": "Connect Vaquejada",
+    "artifactName": "Connect-Vaquejada-Setup-${version}-${arch}.${ext}",
+    "directories": { "output": "../release" },
+    "files": ["main.cjs", "package.json"],
+    "extraResources": [
+      { "from": "../.next/desktop-server", "to": "server", "filter": ["**/*", "!node_modules/**"] },
+      { "from": "../.next/desktop-server/node_modules", "to": "server/node_modules", "filter": ["**/*"] }
+    ],
+    "win": { "target": "nsis", "icon": "../.next/desktop-icon.png" },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "installerLanguages": ["pt_BR"]
+    }
+  }
+}

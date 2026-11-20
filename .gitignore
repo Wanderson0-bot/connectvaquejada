@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+/desktop/node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -39,3 +40,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+file_0000000030dc820e8265b3cacafd3415.pdf
+# Instaladores do aplicativo Windows
+/release/
+
+# Metadados locais do Supabase CLI
+/supabase/.temp/
