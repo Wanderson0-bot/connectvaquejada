@@ -269,29 +269,3 @@ export async function configurarSubstituicao(formData: FormData) {
   });
   finish(eventoId, categoriaId, error, "configuracao");
 }
-
-export async function solicitarBoiTvApresentacao(formData: FormData) {
-  const { eventoId, categoriaId } = readScope(formData);
-  const corridaId = String(formData.get("corrida_id") ?? "");
-  const tipo = String(formData.get("tipo_solicitacao") ?? "");
-  const reclamanteId = String(formData.get("reclamante_dupla_id") ?? "");
-  if (!uuidPattern.test(corridaId) || !uuidPattern.test(reclamanteId) || !["a_favor", "contra_terceiro"].includes(tipo)) {
-    redirect(`${route(eventoId, categoriaId)}&erro=campos`);
-  }
-  const supabase = await createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) redirect("/");
-  const { data, error } = await supabase.rpc("pista_ops_boi_tv_solicitar_com_origem", {
-    p_corrida_id: corridaId,
-    p_tipo: tipo,
-    p_reclamante_dupla_id: reclamanteId,
-    p_origem: "apresentacao",
-  });
-  if (error || typeof data !== "string" || !uuidPattern.test(data)) {
-    redirect(`${route(eventoId, categoriaId)}&erro=boi-tv`);
-  }
-  revalidatePath(route(eventoId, categoriaId));
-  revalidatePath(`/eventos/${eventoId}/pista-ops`);
-  revalidatePath(`/painel/operacoes/${eventoId}`);
-  redirect(`${route(eventoId, categoriaId)}&sucesso=boi-tv`);
-}

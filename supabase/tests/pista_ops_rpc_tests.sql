@@ -481,6 +481,18 @@ begin
   select dupla_id into claimant_one from public.pista_ops_runs where id=run_one;
   select puxador_id into competitor_one from public.duplas where id=claimant_one;
   perform set_config('request.jwt.claims',json_build_object('sub',office_id)::text,true);
+  begin
+    perform public.pista_ops_boi_tv_solicitar_com_origem(run_one,'a_favor',claimant_one,'locucao');
+    raise exception 'TEST_BOI_TV_OFFICE_REQUEST_ALLOWED';
+  exception when insufficient_privilege then null;
+  end;
+  perform set_config('request.jwt.claims',json_build_object('sub',organizer_id)::text,true);
+  begin
+    perform public.pista_ops_boi_tv_solicitar_com_origem(run_one,'a_favor',claimant_one,'locucao');
+    raise exception 'TEST_BOI_TV_ORGANIZER_REQUEST_ALLOWED';
+  exception when insufficient_privilege then null;
+  end;
+  perform set_config('request.jwt.claims',json_build_object('sub',announcer_id)::text,true);
   review_one := public.pista_ops_boi_tv_solicitar_com_origem(run_one,'a_favor',claimant_one,'locucao');
   select id into attendance_one from public.pista_ops_boi_tv_atendimentos where revisao_pista_id=review_one;
   if attendance_one is null or (select dados_apresentacao->>'numero_boi' from public.pista_ops_boi_tv_atendimentos where id=attendance_one) <> '1'
@@ -494,19 +506,18 @@ begin
   if call_two->>'status' is distinct from 'chamada' then raise exception 'TEST_BOI_TV_QUEUE_ADVANCE_FAILED: %',call_two; end if;
   run_two := public.pista_ops_registrar_resultado((call_two->>'item_id')::uuid,'zero',0);
   select dupla_id into claimant_two from public.pista_ops_runs where id=run_two;
-  perform set_config('request.jwt.claims',json_build_object('sub',office_id)::text,true);
-  review_two := public.pista_ops_boi_tv_solicitar_com_origem(run_two,'a_favor',claimant_two,'escritorio');
+  review_two := public.pista_ops_boi_tv_solicitar_com_origem(run_two,'a_favor',claimant_two,'locucao');
   select id into attendance_two from public.pista_ops_boi_tv_atendimentos where revisao_pista_id=review_two;
   perform set_config('request.jwt.claims',json_build_object('sub',announcer_id)::text,true);
   call_three := public.pista_ops_chamar_proxima_automatica(round_id,'71000000-0000-4000-8000-000000000003');
   if call_three->>'status' is distinct from 'chamada' then raise exception 'TEST_BOI_TV_QUEUE_SECOND_ADVANCE_FAILED: %',call_three; end if;
   raise notice 'BOI TV queue: PASS (two pending reviews while later calls continue)';
 
-  -- Duplicate open request is rejected, even when retried through another UI.
-  perform set_config('request.jwt.claims',json_build_object('sub',office_id)::text,true);
+  -- Duplicate open request is rejected.
+  perform set_config('request.jwt.claims',json_build_object('sub',announcer_id)::text,true);
   was_denied := false;
   begin
-    perform public.pista_ops_boi_tv_solicitar_com_origem(run_one,'a_favor',claimant_one,'apresentacao');
+    perform public.pista_ops_boi_tv_solicitar_com_origem(run_one,'a_favor',claimant_one,'locucao');
   exception when sqlstate 'P0001' then
     get stacked diagnostics state_text=message_text;
     was_denied := state_text='PISTA_TV_REVIEW_PENDING';
@@ -579,6 +590,12 @@ begin
     if sqlerrm<>'X1_RESULT_CONFLICT' then raise; end if;
   end;
   perform set_config('request.jwt.claims',json_build_object('sub',office_id)::text,true);
+  begin
+    perform public.x1_solicitar_revisao_com_origem(x1_bull_one,'a_favor',entry_a,'x1');
+    raise exception 'TEST_X1_OFFICE_REQUEST_ALLOWED';
+  exception when insufficient_privilege then null;
+  end;
+  perform set_config('request.jwt.claims',json_build_object('sub',announcer_id)::text,true);
   x1_id := public.x1_solicitar_revisao_com_origem(x1_bull_one,'a_favor',entry_a,'x1');
   perform set_config('request.jwt.claims',json_build_object('sub',announcer_id)::text,true);
   perform public.x1_registrar_boi(x1_match,'zero');

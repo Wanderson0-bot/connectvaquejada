@@ -116,17 +116,6 @@ export async function configurarBoiTv(formData: FormData) {
   finish(scope, error, "boi-tv-configurado", data === (raw === "true"));
 }
 
-export async function solicitarBoiTv(formData: FormData) {
-  const scope = readScope(formData);
-  const runId = String(formData.get("corrida_id") ?? "");
-  const type = String(formData.get("tipo_solicitacao") ?? "");
-  const claimantId = String(formData.get("reclamante_dupla_id") ?? "");
-  if (!validId(runId) || !validId(claimantId) || !["a_favor","contra_terceiro"].includes(type)) finish(scope, null, "", false);
-  const supabase = await requireUser();
-  const { data, error } = await supabase.rpc("pista_ops_boi_tv_solicitar_com_origem", { p_corrida_id: runId, p_tipo: type, p_reclamante_dupla_id: claimantId, p_origem: "escritorio" });
-  finish(scope, error, "boi-tv-solicitado", typeof data === "string" && validId(data));
-}
-
 export async function decidirBoiTv(formData: FormData) {
   const scope = readScope(formData);
   const reviewId = String(formData.get("revisao_id") ?? "");

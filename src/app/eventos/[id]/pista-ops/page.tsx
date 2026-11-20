@@ -416,7 +416,7 @@ export default async function PistaOpsPage({ params, searchParams }: Props) {
                     Aguardando planejamento e início do rodízio no painel administrativo.
                   </p>
                 )}
-                {activeRound && boiTvState?.habilitado && (roles.has("organizador") || roles.has("escritorio") || roles.has("locutor")) && (
+                {activeRound && boiTvState?.habilitado && roles.has("locutor") && (
                   <section className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-stone-900">
                     <h2 className="font-bold">Boi TV · solicitações da locução</h2>
                     <p className="mt-1 text-sm">Pedidos ficam vinculados à corrida original e não pausam o avanço da fila.</p>

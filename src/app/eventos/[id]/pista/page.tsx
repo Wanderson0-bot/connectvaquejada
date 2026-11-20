@@ -11,7 +11,6 @@ import {
   registrarRaboDaGata,
   registrarResultado,
   registrarRetorno,
-  solicitarBoiTvApresentacao,
 } from "./actions";
 
 type Props = {
@@ -41,7 +40,6 @@ const erros: Record<string, string> = {
   acesso: "Sua função neste evento não permite essa operação.",
   autorizacao: "Não foi possível confirmar a autorização para operar a Pista.",
   campos: "Confira os campos e tente novamente.",
-  "boi-tv": "Falha ao encaminhar apresentacao para o BOI TV.",
   "pontuacao-max": "A pontuação de cada corrida deve ser de no máximo 40 pontos.",
   estado: "O estado da fila ou da posição mudou. Atualize a página antes de tentar novamente.",
   operacao: "A operação falhou. Nenhum sucesso foi confirmado; atualize e tente novamente.",
@@ -58,7 +56,6 @@ const sucessos: Record<string, string> = {
   resultado: "Resultado registrado.",
   retorno: "Retorno registrado; o boi permanece reservado para esta corrida.",
   "rabo-da-gata": "Corrida encaminhada ao fim da fila sem reserva antecipada.",
-  "boi-tv": "Apresentacao encaminhada para analise BOI TV.",
   "retorno-liberado": "Retorno encaminhado conforme o destino escolhido.",
   configuracao: "Configuração de substituição atualizada.",
 };
@@ -207,9 +204,6 @@ export default async function PistaPage({ params, searchParams }: Props) {
   }> = [];
   let ocorrencias: Array<{ id: string; fila_id: string; tipo: string }> = [];
   let permiteSubstituicao = false;
-  let boiTvHabilitado = false;
-  let boiTvRuns: Array<{ id: string; dupla_id: string; numero_corrida: number; estado: string }> = [];
-  let boiTvReviewedRunIds = new Set<string>();
   let erroDados = false;
 
   if (categoriaId && autorizado) {
@@ -310,15 +304,6 @@ export default async function PistaPage({ params, searchParams }: Props) {
       }
     }
 
-    const [{ data: opsData }, { data: boiTvData }] = await Promise.all([
-      supabase.rpc("pista_ops_state", { p_evento_id: evento.id, p_categoria_id: categoriaId }),
-      supabase.rpc("pista_ops_boi_tv_estado", { p_evento_id: evento.id, p_categoria_id: categoriaId }),
-    ]);
-    const opsState = opsData as { rodizios?: Array<{ corridas?: Array<{ id: string; dupla_id: string; numero_corrida: number; estado: string }> }> } | null;
-    const tvState = boiTvData as { habilitado?: boolean; revisoes?: Array<{ corrida_id: string }> } | null;
-    boiTvHabilitado = tvState?.habilitado === true;
-    boiTvRuns = (opsState?.rodizios ?? []).flatMap((round) => round.corridas ?? []);
-    boiTvReviewedRunIds = new Set((tvState?.revisoes ?? []).map((review) => review.corrida_id));
   }
 
   const sucessoTexto = sucesso ? sucessos[sucesso] : undefined;
@@ -627,7 +612,6 @@ export default async function PistaPage({ params, searchParams }: Props) {
                       const resultado = resultadosPorCorrida.get(
                         `${fila.dupla_id}:${fila.numero_corrida}`
                       );
-                      const opsRun = boiTvRuns.find((run) => run.dupla_id === fila.dupla_id && run.numero_corrida === fila.numero_corrida && run.estado === (resultado?.resultado === "zero" ? "zero" : "valeu_boi"));
                       return (
                         <li key={fila.id} className="rounded-lg border p-4">
                           <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -645,28 +629,6 @@ export default async function PistaPage({ params, searchParams }: Props) {
                               Resultado vigente: {resultado.resultado === "zero" ? "Zero" : "Valeu Boi"}{" "}
                               · {resultado.pontuacao} pontos
                             </p>
-                          )}
-                          {boiTvHabilitado && resultado && opsRun && !boiTvReviewedRunIds.has(opsRun.id) && autorizado && (
-                            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-amber-50 p-3 text-sm">
-                              <span>Boi TV · enviar esta apresentação para análise</span>
-                              {resultado.resultado === "zero" ? (
-                                <form action={solicitarBoiTvApresentacao}>
-                                  {camposEscopo(evento.id, categoria.id)}
-                                  <input type="hidden" name="corrida_id" value={opsRun.id} />
-                                  <input type="hidden" name="tipo_solicitacao" value="a_favor" />
-                                  <input type="hidden" name="reclamante_dupla_id" value={fila.dupla_id} />
-                                  <button className="rounded border border-amber-700 px-3 py-2 font-semibold text-amber-950">Boi a favor</button>
-                                </form>
-                              ) : (
-                                <form action={solicitarBoiTvApresentacao} className="flex flex-wrap items-center gap-2">
-                                  {camposEscopo(evento.id, categoria.id)}
-                                  <input type="hidden" name="corrida_id" value={opsRun.id} />
-                                  <input type="hidden" name="tipo_solicitacao" value="contra_terceiro" />
-                                  <label>Solicitante<select name="reclamante_dupla_id" required defaultValue="" className="ml-2 h-10 rounded border px-2"><option value="" disabled>Escolher senha</option>{duplas.filter((item) => item.id !== fila.dupla_id).map((item) => <option key={item.id} value={item.id}>Senha {item.numero_senha}</option>)}</select></label>
-                                  <button className="rounded border border-amber-700 px-3 py-2 font-semibold text-amber-950">Boi contra</button>
-                                </form>
-                              )}
-                            </div>
                           )}
                           {competidor && (
                             <p className="mt-2 text-sm">

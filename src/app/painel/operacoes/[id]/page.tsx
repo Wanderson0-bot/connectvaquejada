@@ -11,7 +11,6 @@ import {
   registrarRaboDaGata,
   configurarBoiTv,
   decidirBoiTv,
-  solicitarBoiTv,
 } from "@/app/painel/operacoes/pista-actions";
 
 type Props = {
@@ -94,7 +93,6 @@ const successMessages: Record<string, string> = {
   "rabo-concluido": "Rabo da Gata concluído sem consumir boi.",
   "morte-subita": "Configuração de morte súbita atualizada.",
   "boi-tv-configurado": "Configuração do boi de TV atualizada para o evento.",
-  "boi-tv-solicitado": "Boi encaminhado para análise. O resultado inicial foi preservado.",
   "boi-tv-julgado": "Decisão da alternativa registrada e resultado final atualizado.",
 };
 
@@ -370,7 +368,7 @@ export default async function OperacaoAdminPage({ params, searchParams }: Props)
                   <div className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
                     <div>
                       <p className="font-semibold">Recurso no evento · {boiTvState.habilitado ? "Disponível" : "Desativado"}</p>
-                      <p className="mt-1 text-sm text-stone-700">Quando ativado, o escritório pode encaminhar um resultado para análise e a decisão fica registrada no histórico da corrida.</p>
+                      <p className="mt-1 text-sm text-stone-700">Quando ativado, a locução pode encaminhar um resultado para análise e a decisão fica registrada no histórico da corrida.</p>
                     </div>
                     {canOrganize && <form action={configurarBoiTv}>
                       <HiddenScope eventId={eventId} categoryId={category.id} />
@@ -385,20 +383,6 @@ export default async function OperacaoAdminPage({ params, searchParams }: Props)
                     <Link href={`/painel/dispositivos?evento=${eventId}&funcao=boi_tv`} className="mt-3 inline-flex rounded-lg bg-amber-800 px-4 py-2 font-semibold text-white">Autorizar dispositivo BOI TV</Link>
                   </div>}
                   {boiTvState.habilitado && <Link className="mb-4 inline-flex rounded-lg border border-amber-700 px-4 py-2 font-semibold text-amber-950" href={`/boi-tv/${eventId}`}>Abrir central BOI TV do evento</Link>}
-                  {boiTvState.habilitado && allRuns.some((run) => ["zero","valeu_boi"].includes(run.estado) && !boiTvState.revisoes.some((review) => review.corrida_id === run.id)) && (
-                    <div className="mb-5 rounded-lg border p-4">
-                      <h3 className="font-semibold">Solicitações para a alternativa</h3>
-                      <p className="mt-1 text-sm text-stone-600">Boi a favor: contesta um zero da própria senha. Boi contra/de terceiro: contesta um valeu dado a outra senha.</p>
-                      <ul className="mt-3 divide-y">
-                        {allRuns.filter((run) => ["zero","valeu_boi"].includes(run.estado) && !boiTvState.revisoes.some((review) => review.corrida_id === run.id)).map((run) => (
-                          <li key={run.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
-                            <span>Rodízio #{run.roundNumber} · Senha {run.numero_senha} · Corrida {run.numero_corrida} · {run.estado === "zero" ? "Zero" : `Valeu Boi · ${scoreLabel(run.pontuacao)}`}</span>
-                            {run.estado === "zero" ? <form action={solicitarBoiTv} className="flex flex-wrap items-center gap-2"><HiddenScope eventId={eventId} categoryId={category.id} /><input type="hidden" name="corrida_id" value={run.id}/><input type="hidden" name="tipo_solicitacao" value="a_favor"/><input type="hidden" name="reclamante_dupla_id" value={run.dupla_id}/><button className="rounded-md border border-amber-700 px-3 py-2 font-semibold text-amber-950">Contestar meu zero · boi a favor</button></form> : <form action={solicitarBoiTv} className="flex flex-wrap items-center gap-2"><HiddenScope eventId={eventId} categoryId={category.id} /><input type="hidden" name="corrida_id" value={run.id}/><input type="hidden" name="tipo_solicitacao" value="contra_terceiro"/><label className="text-sm">Solicitante<select name="reclamante_dupla_id" required defaultValue="" className="ml-2 h-10 rounded-md border px-2"><option value="" disabled>Escolher senha</option>{state.duplas.filter((entry) => entry.id !== run.dupla_id).map((entry) => <option key={entry.id} value={entry.id}>Senha {entry.numero_senha}</option>)}</select></label><button className="rounded-md border border-amber-700 px-3 py-2 font-semibold text-amber-950">Contestar valeu · boi contra/de terceiro</button></form>}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
                   <h3 className="font-semibold">Histórico de análises</h3>
                   {boiTvState.revisoes.length ? <ul className="mt-3 divide-y rounded-lg border">
                     {boiTvState.revisoes.map((review) => <li key={review.id} className="p-4">
