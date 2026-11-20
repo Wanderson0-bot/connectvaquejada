@@ -22,6 +22,15 @@ export function EstadoConexao() {
   const operando = pathname.startsWith("/eventos/") || pathname.startsWith("/boi-tv");
   const area = pathname.match(/^(\/eventos\/[^/]+)\/(duplas|pista-ops)(?:\/|$)/);
   const atualizarAutomaticamente = /^(\/eventos\/[^/]+)\/(duplas|pista-ops|x1)$/.test(pathname);
+  if (area?.[2] === "pista-ops") {
+    return online ? (
+      <RefreshOnInterval enabled={atualizarAutomaticamente} everyMs={15000} />
+    ) : (
+      <aside role="status" className="border-b bg-amber-100 px-4 py-2 text-sm text-amber-950">
+        Sem conexão. Aguarde a confirmação do servidor antes de repetir uma operação.
+      </aside>
+    );
+  }
   if (!operando && online) return null;
   return (
     <aside className={online ? "flex flex-wrap items-center gap-2 border-b bg-stone-50 px-4 text-sm text-stone-700" : "flex flex-wrap items-center gap-2 border-b bg-amber-100 px-4 text-sm text-amber-950"}>
