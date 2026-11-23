@@ -33,22 +33,17 @@ export async function criarEventoDoParque(formData: FormData) {
   const parqueId = String(formData.get("parque_id") ?? "");
   const nome = String(formData.get("nome") ?? "").trim();
   const data = String(formData.get("data") ?? "");
-  const formato = String(formData.get("formato_competicao") ?? "tradicional");
   if (!parqueId || !nome || !data) redirect(`/parques/${encodeURIComponent(parqueId)}?erro=evento`);
-  if (!["tradicional", "tropa_de_elite"].includes(formato)) {
-    redirect(`/parques/${encodeURIComponent(parqueId)}/eventos/novo?erro=formato`);
-  }
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/");
-  const { data: id, error } = await supabase.rpc("painel_criar_evento_com_formato", {
+  const { data: id, error } = await supabase.rpc("painel_criar_evento", {
     p_parque_id: parqueId,
     p_nome: nome,
     p_data: data,
-    p_formato_competicao: formato,
   });
   if (error || typeof id !== "string") {
-    if (error) console.error("Falha ao criar evento com formato:", error.code, error.message);
+    if (error) console.error("Falha ao criar evento:", error.code, error.message);
     redirect(`/parques/${encodeURIComponent(parqueId)}?erro=evento`);
   }
   redirect(`/eventos/${id}`);

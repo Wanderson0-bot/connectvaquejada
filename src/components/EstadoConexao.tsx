@@ -17,11 +17,13 @@ function observarConexao(listener: () => void) {
 export function EstadoConexao() {
   const online = useSyncExternalStore(observarConexao, () => navigator.onLine, () => true);
   const pathname = usePathname();
+  const relatorioOperacional = /^\/eventos\/[^/]+\/relatorio-operacional$/.test(pathname);
   const router = useRouter();
   const [atualizando, iniciarAtualizacao] = useTransition();
   const operando = pathname.startsWith("/eventos/") || pathname.startsWith("/boi-tv");
   const area = pathname.match(/^(\/eventos\/[^/]+)\/(duplas|pista-ops)(?:\/|$)/);
   const atualizarAutomaticamente = /^(\/eventos\/[^/]+)\/(duplas|pista-ops|x1)$/.test(pathname);
+  if (relatorioOperacional) return null;
   if (area?.[2] === "pista-ops") {
     return online ? (
       <RefreshOnInterval enabled={atualizarAutomaticamente} everyMs={15000} />

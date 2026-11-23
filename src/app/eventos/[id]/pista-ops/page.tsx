@@ -1,3 +1,4 @@
+import { Voltar } from "@/components/Voltar";
 import Image from "next/image";
 import Link from "next/link";
 import { randomUUID } from "node:crypto";
@@ -109,34 +110,25 @@ export default async function PistaOpsPage({ params, searchParams }: Props) {
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) redirect("/");
 
+  const { data: deviceContext } = await supabase.rpc("pista_ops_device_context", { p_evento_id: eventId });
+  const voltar = !user.is_anonymous && !deviceContext && <Voltar />;
+
   const { data: eventoStatus, error: eventoStatusError } = await supabase
     .from("eventos")
-    .select("status_operacional,formato_competicao")
+    .select("status_operacional")
     .eq("id", eventId)
     .maybeSingle();
   if (eventoStatusError) {
     return (
       <main className={`${styles.shell} mx-auto min-h-screen w-full max-w-6xl px-4 py-8 sm:px-8`}>
+        {voltar}
         <p role="alert" className="rounded-lg border-l-4 border-amber-700 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-          Não foi possível carregar o formato da competição. Verifique se a migration de Tropa de Elite foi aplicada.
+          Não foi possível carregar a situação da vaquejada.
         </p>
       </main>
     );
   }
   if (!eventoStatus) notFound();
-  if (eventoStatus.formato_competicao === "tropa_de_elite") {
-    return (
-      <main className={`${styles.shell} mx-auto min-h-screen w-full max-w-6xl px-4 py-8 sm:px-8`}>
-        <Link href={`/eventos/${eventId}`} className="text-sm text-gray-600 underline">Voltar ao evento</Link>
-        <section className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-5">
-          <h1 className="text-2xl font-bold text-emerald-950">Tropa de Elite · fase eliminatória</h1>
-          <p className="mt-2 text-emerald-950">Este formato não utiliza rodízios classificatórios. Abra o chaveamento para registrar cada boi e avançar os vencedores.</p>
-          <Link href={`/eventos/${eventId}/x1`} className="mt-4 inline-flex rounded-lg bg-emerald-800 px-5 py-3 font-bold text-white">Abrir chave eliminatória</Link>
-        </section>
-      </main>
-    );
-  }
-
   if (eventoStatus.status_operacional !== "em_andamento") {
     const message = eventoStatus.status_operacional === "pausado"
       ? "A vaquejada está pausada. A locução ficará bloqueada até o evento ser retomado."
@@ -147,18 +139,23 @@ export default async function PistaOpsPage({ params, searchParams }: Props) {
           : "A locução ficará disponível quando a vaquejada for iniciada.";
     return (
       <main className={`${styles.shell} mx-auto min-h-screen w-full max-w-6xl px-4 py-8 sm:px-8`}>
-        <Link href="/painel" className="text-sm text-gray-600 underline">Voltar ao painel</Link>
+        {voltar}
         <p role="status" className="mt-5 rounded-lg border-l-4 border-orange-500 bg-orange-50 p-4 text-orange-950">{message}</p>
       </main>
     );
   }
 
-  const { data, error: stateError } = await supabase.rpc("pista_ops_state", {
-    p_evento_id: eventId,
-    p_categoria_id: categoryId || null,
-  });
+  const [{ data, error: stateError }, { data: modelos, error: modelosError }] = await Promise.all([
+    supabase.rpc("pista_ops_state", { p_evento_id: eventId, p_categoria_id: categoryId || null }),
+    supabase.rpc("pista_ops_categorias", { p_evento_id: eventId }).eq("modelo_competicao", "eliminatoria"),
+  ]);
+  const eliminatoriaIds = new Set(((modelos ?? []) as { id: string }[]).map((item) => item.id));
   const state = data as unknown as State | null;
-  const { data: deviceContext } = await supabase.rpc("pista_ops_device_context", { p_evento_id: eventId });
+  const rodizioAnteriorEmAndamento = state?.rodizios.some((round) => round.estado === "ativo" || round.estado === "aguardando_proximo_rodizio");
+  if (categoryId && eliminatoriaIds.has(categoryId) && !rodizioAnteriorEmAndamento) {
+    redirect(`/eventos/${eventId}/x1?categoria=${categoryId}`);
+  }
+  const failedToLoad = stateError || modelosError;
   const category = state?.categorias.find((item) => item.id === categoryId);
   const roles = new Set(deviceContext?.funcao ? [String(deviceContext.funcao)] : (state?.minhas_funcoes ?? []));
   const canOperate = ["organizador", "escritorio", "locutor"].some((role) => roles.has(role));
@@ -208,15 +205,13 @@ export default async function PistaOpsPage({ params, searchParams }: Props) {
 
   return (
     <main className={`${styles.shell} mx-auto min-h-screen w-full max-w-6xl px-4 py-5 sm:px-8 sm:py-7`}>
-      {!stateError && state && !categoryId && (
+      {voltar}
+      {!failedToLoad && state && !categoryId && (
         <section className="mx-auto max-w-3xl py-8">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm text-stone-600">{state.evento.nome}</p>
-              <h1 className="text-2xl font-bold text-stone-950">Selecione uma categoria</h1>
-            </div>
-            <Link href="/painel" className="text-sm font-semibold text-orange-800 underline">Painel</Link>
-          </div>
+          <header>
+            <p className="text-sm text-stone-600">{state.evento.nome}</p>
+            <h1 className="text-2xl font-bold text-stone-950">Selecione uma categoria</h1>
+          </header>
           {state.categorias.length === 0 ? (
             <p className="mt-5 rounded-lg bg-white p-4 text-sm text-stone-600">Este evento ainda não possui categorias.</p>
           ) : (
@@ -224,7 +219,7 @@ export default async function PistaOpsPage({ params, searchParams }: Props) {
               {state.categorias.map((item) => (
                 <li key={item.id}>
                   <Link className="flex min-h-14 items-center justify-between gap-4 px-4 py-3 font-semibold hover:bg-orange-50" href={`/eventos/${eventId}/pista-ops?categoria=${item.id}`}>
-                    <span>{item.nome}</span><span className="text-sm text-orange-800">Abrir locução</span>
+                    <span>{item.nome}</span><span className="text-sm text-orange-800">{eliminatoriaIds.has(item.id) ? "Abrir eliminatória" : "Abrir locução"}</span>
                   </Link>
                 </li>
               ))}
@@ -233,16 +228,16 @@ export default async function PistaOpsPage({ params, searchParams }: Props) {
         </section>
       )}
 
-      {stateError && (
+      {failedToLoad && (
         <p role="alert" className="mt-5 rounded-lg border-l-4 border-amber-700 bg-amber-50 px-4 py-3 text-sm text-amber-950">
           Não foi possível carregar a locução. Verifique se as migrations operacionais foram aplicadas e se o usuário tem acesso ao evento.
         </p>
       )}
-      {!stateError && state && categoryId && !category && (
+      {!failedToLoad && state && categoryId && !category && (
         <p role="alert" className="mt-6 text-sm text-red-800">A categoria não pertence a este evento ou não está disponível.</p>
       )}
 
-      {!stateError && state && categoryId && category && (
+      {!failedToLoad && state && categoryId && category && (
         <>
           {!canOperate && <p role="alert" className="mb-4 rounded-md bg-amber-50 p-4 text-sm text-amber-950">Seu usuário não tem uma função ativa da Pista neste evento.</p>}
           {canOperate && (

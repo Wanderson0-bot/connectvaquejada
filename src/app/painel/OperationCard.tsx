@@ -9,7 +9,6 @@ type Operation = {
   id: string;
   nome: string;
   data: string;
-  formato_competicao: string;
   status_operacional: string;
   quantidade_inscricoes: number;
   quantidade_dispositivos: number;
@@ -26,7 +25,7 @@ function startTime(value: string | null) {
   }).format(new Date(value));
 }
 
-export function OperationCard({ operation }: { operation: Operation }) {
+export function OperationCard({ operation, podeSupervisionar }: { operation: Operation; podeSupervisionar: boolean }) {
   const active = operation.status_operacional === "em_andamento";
   return <article className="operation-card">
     <div className="flex flex-col gap-4 p-5 sm:p-6 xl:flex-row xl:items-start xl:justify-between">
@@ -42,9 +41,6 @@ export function OperationCard({ operation }: { operation: Operation }) {
           <span aria-hidden="true">·</span>
           <Clock3 className="size-4 shrink-0 text-stone-500" aria-hidden="true" />
           <span>Início às {startTime(operation.iniciadoEm)}</span>
-        </p>
-        <p className="mt-2 text-sm font-semibold text-stone-700">
-          Formato: {operation.formato_competicao === "tropa_de_elite" ? "Tropa de Elite · eliminatória" : operation.formato_competicao === "tradicional" ? "Tradicional · classificatória" : "Não identificado"}
         </p>
       </div>
 
@@ -73,10 +69,11 @@ export function OperationCard({ operation }: { operation: Operation }) {
     </div>
 
     <div className="p-5 sm:p-6">
+      {podeSupervisionar && <Link href={`/eventos/${operation.id}/supervisao-equipe`} className="operation-primary mb-3">Central da Equipe</Link>}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Link href={`/painel/operacoes/${operation.id}`} className="operation-secondary"><Settings2 className="size-4" aria-hidden="true" /> Administrar</Link>
         <Link href={`/eventos/${operation.id}/duplas`} className="operation-secondary"><Ticket className="size-4" aria-hidden="true" /> Escritório</Link>
-        <Link href={operation.formato_competicao === "tropa_de_elite" ? `/eventos/${operation.id}/x1` : operation.formato_competicao === "tradicional" ? `/eventos/${operation.id}/pista-ops` : `/eventos/${operation.id}`} className="operation-primary"><Mic className="size-4" aria-hidden="true" /> {operation.formato_competicao === "tropa_de_elite" ? "Eliminatória" : operation.formato_competicao === "tradicional" ? "Locução" : "Ver evento"}</Link>
+        <Link href={`/eventos/${operation.id}/pista-ops`} className="operation-primary"><Mic className="size-4" aria-hidden="true" /> Locução</Link>
       </div>
 
       <div className="mt-4 flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50/70 p-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">

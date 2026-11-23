@@ -1,3 +1,4 @@
+import { Voltar } from "@/components/Voltar";
 import Link from "next/link";
 import Image from "next/image";
 import { notFound, redirect } from "next/navigation";
@@ -24,7 +25,7 @@ export default async function DuplasPage({ params, searchParams }: Props) {
   let competitorQuery = supabase.from("competidores").select("id,nome");
   competitorQuery = evento.operacao_temporaria ? competitorQuery.eq("evento_id",id) : competitorQuery.eq("parque_id",evento.parque_id);
   const [{ data: categorias }, { data: duplas, error: erroDuplas }, { data: competidores }] = await Promise.all([
-    supabase.from("categorias").select("id,nome,ordem,valor_inscricao,ativa").eq("evento_id",id).order("ordem",{ascending:true}),
+    supabase.from("categorias").select("id,nome,ordem,valor_inscricao,ativa,modelo_competicao").eq("evento_id",id).order("ordem",{ascending:true}),
     supabase.from("duplas").select("id,numero_senha,status_pagamento,motivo_isencao,categoria_id,puxador_id,nome_cavalo,nome_equipe").eq("evento_id",id).neq("status_pagamento","cancelado").order("numero_senha",{ascending:true}),
     competitorQuery,
   ]);
@@ -35,6 +36,7 @@ export default async function DuplasPage({ params, searchParams }: Props) {
   const mensagemErro = erro === "campos" ? "Confira o nome, a senha e o status do pagamento. Para isenção, informe o motivo." : erro === "senha-repetida" ? "Este número de senha já está em uso nesta categoria." : erro === "status" ? "Selecione um status de pagamento válido." : erro === "motivo" ? "Informe o motivo da isenção." : erro === "pagamento" ? "Não foi possível atualizar o pagamento." : erro === "categoria" ? "Não foi possível salvar a categoria." : erro === "categoria-em-uso" ? "Esta categoria possui inscrições ou dados relacionados; ela não foi excluída." : erro === "inscricao-excluir" ? "Não foi possível excluir esta inscrição." : null;
   return <main className={styles.page}>
     <div className={styles.content}>
+      {!user.is_anonymous && !deviceContext && <Voltar />}
       <header className={styles.header}>
         <Link href={`/eventos/${id}/duplas`} aria-label="Atualizar escritório" className={styles.brand}>
           <Image src="/logo-connect-vaquejada.png" alt="Connect Vaquejada" width={180} height={92} priority className={styles.logo} />

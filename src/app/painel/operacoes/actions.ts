@@ -8,18 +8,15 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 
 export async function iniciarOperacao(formData: FormData) {
   const nome = String(formData.get("nome") ?? "").trim();
-  const formato = String(formData.get("formato_competicao") ?? "tradicional");
   if (!nome || nome.length > 120) redirect("/painel?erro=nome-operacao");
-  if (!["tradicional", "tropa_de_elite"].includes(formato)) redirect("/painel?erro=formato-operacao");
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/");
-  const { data: id, error } = await supabase.rpc("painel_iniciar_operacao_com_formato", {
+  const { data: id, error } = await supabase.rpc("painel_iniciar_operacao", {
     p_nome: nome,
-    p_formato_competicao: formato,
   });
   if (error || !id) {
-    if (error) console.error("Falha ao iniciar operação com formato:", error.code, error.message);
+    if (error) console.error("Falha ao iniciar operação:", error.code, error.message);
     redirect("/painel?erro=iniciar-operacao");
   }
   revalidatePath("/painel");

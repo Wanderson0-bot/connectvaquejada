@@ -1,3 +1,4 @@
+import { Voltar } from "@/components/Voltar";
 import Link from "next/link";
 import { CalendarDays, Layers3, MapPin, Plus, RefreshCw, Ticket, Tag, ArrowRight } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
@@ -21,12 +22,13 @@ export default async function ParquePage({ params, searchParams }: PageProps<"/p
   ]);
   const parque = (parques ?? []).find((item: { id: string }) => item.id === id);
   if (!parque) notFound();
-  if (error) return <PainelShell active="painel"><p role="alert">Não foi possível carregar os eventos deste parque.</p></PainelShell>;
+  if (error) return <PainelShell active="painel"><Voltar /><p role="alert">Não foi possível carregar os eventos deste parque.</p></PainelShell>;
   const eventos = (lista ?? []) as Evento[];
   const hoje = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
   return <PainelShell active="painel">
+    <Voltar />
     <header className="mb-7 flex flex-wrap items-start justify-between gap-4">
-      <div><Link href="/painel" className="text-sm text-gray-500 underline">Painel</Link><h1 className="mt-2 text-3xl font-bold sm:text-4xl">{parque.nome}</h1>
+      <div><h1 className="mt-2 text-3xl font-bold sm:text-4xl">{parque.nome}</h1>
         <p className="mt-2 flex flex-wrap items-center gap-2 text-gray-600"><MapPin className="size-4" />{parque.localizacao}<span className="mx-2 text-gray-300">|</span><Layers3 className="size-5" />{String(parque.quantidade_eventos).padStart(2,"0")} eventos</p></div>
       <Link href={`/parques/${id}/eventos/novo`} aria-label="Criar evento" className="flex size-11 items-center justify-center rounded-full bg-[#87320a] text-white hover:bg-[#a34614]"><Plus className="size-7" /></Link>
     </header>

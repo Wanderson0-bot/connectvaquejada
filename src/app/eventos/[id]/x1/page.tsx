@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Voltar } from "@/components/Voltar";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createBracket, decideReview, registerBull, requestReview } from "./actions";
@@ -7,9 +7,10 @@ type Entry = { id: string; senha: number; nome: string; equipe: string | null };
 type Bull = { id: string; numero: number; lado: number; dupla_id: string; resultado: string; revisao: string | null; revisao_id: string | null; prazo: string | null; tipo_solicitacao: "a_favor" | "contra_terceiro" | null; reclamante_dupla_id: string | null; reclamante: string | null };
 type Match = { id: string; fase: number; posicao: number; estado: string; lado_a: string | null; lado_b: string | null; vencedor: string | null; nome_a: string | null; nome_b: string | null; bois: Bull[] };
 type State = { bracket: { melhor_de: number; estado: string } | null; inscricoes: Entry[]; confrontos: Match[] };
+type Category = { id: string; nome: string; modelo_competicao: string };
 
 const errors: Record<string,string> = {
-  X1_CONFIG_INVALID: "Escolha melhor de 3 ou 5 e pelo menos dois competidores.",
+  X1_CONFIG_INVALID: "Confira o modelo da categoria e selecione de dois a dezesseis competidores.",
   X1_ENTRIES_INVALID: "As inscrições precisam ser válidas e não repetidas.",
   X1_ENTRIES_MUST_BE_POWER_OF_TWO: "A quantidade de inscrições precisa ser 2, 4, 8 ou 16.",
   X1_RESULT_CONFLICT: "Outro aparelho já registrou este boi. Confira o placar atualizado antes de continuar.",
@@ -31,15 +32,16 @@ export default async function X1Page({ params, searchParams }: PageProps<"/event
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/");
-  const { data: event, error: eventError } = await supabase.from("eventos").select("id,nome,formato_competicao").eq("id", eventId).maybeSingle();
+  const { data: event, error: eventError } = await supabase.from("eventos").select("id,nome").eq("id", eventId).maybeSingle();
   if (eventError) {
     return <main className="mx-auto min-h-screen max-w-5xl bg-stone-50 px-4 py-10 text-stone-900 sm:px-8">
-      <p role="alert" className="rounded-lg bg-amber-50 p-4 text-amber-950">Não foi possível carregar o formato da competição. Verifique se a migration de Tropa de Elite foi aplicada.</p>
+      <p role="alert" className="rounded-lg bg-amber-50 p-4 text-amber-950">Não foi possível carregar o evento.</p>
     </main>;
   }
   if (!event) notFound();
-  const { data: categories } = await supabase.from("categorias").select("id,nome,ordem").eq("evento_id", eventId).order("ordem");
-  const category = categories?.find((item) => item.id === categoryId);
+  const { data: categoryData, error: categoriesError } = await supabase.rpc("pista_ops_categorias", { p_evento_id: eventId });
+  const categories = (categoryData ?? []) as Category[];
+  const category = categories.find((item) => item.id === categoryId);
   const { data, error } = categoryId ? await supabase.rpc("x1_estado", { p_evento_id: eventId, p_categoria_id: categoryId }) : { data: null, error: null };
   const { data: boiTvEnabled } = categoryId ? await supabase.rpc("pista_ops_boi_tv_habilitado", { p_evento_id: eventId }) : { data: false };
   const { data: locucaoAccess } = boiTvEnabled
@@ -47,13 +49,13 @@ export default async function X1Page({ params, searchParams }: PageProps<"/event
     : { data: null };
   const canRequestBoiTv = Boolean(locucaoAccess);
   const state = data as State | null;
-  const tropaDeElite = event.formato_competicao === "tropa_de_elite";
+  const tropaDeElite = state?.bracket ? state.bracket.melhor_de === 1 : category?.modelo_competicao === "eliminatoria";
   const canSetup = !state?.bracket;
   return <main className="mx-auto min-h-screen max-w-5xl bg-stone-50 px-4 py-8 text-stone-900 sm:px-8">
-    <Link href={`/eventos/${eventId}`} className="text-sm text-stone-600 underline">← {event.nome}</Link>
-    <header className="mt-5"><p className="text-sm font-semibold uppercase tracking-widest text-emerald-800">{tropaDeElite ? "Formato Tropa de Elite" : "Formato mano a mano"}</p><h1 className="mt-1 text-3xl font-black">{tropaDeElite ? "Tropa de Elite · Eliminatória" : "X1 de Vaquejada"}</h1><p className="mt-2 text-stone-600">{tropaDeElite ? "Sem fase classificatória: cada confronto começa com um boi por competidor; empate leva à morte súbita." : "Chaveamento, resultado de cada boi e pedidos de revisão em um só lugar."}</p></header>
+    <Voltar href={user.is_anonymous ? `/eventos/${eventId}/pista-ops` : "/painel"} />
+    <header className="mt-5"><p className="text-sm font-semibold uppercase tracking-widest text-emerald-800">{tropaDeElite ? "Categoria eliminatória" : "Formato mano a mano"}</p><h1 className="mt-1 text-3xl font-black">{tropaDeElite ? `${category?.nome ?? "Tropa de Elite"} · Eliminatória` : "X1 de Vaquejada"}</h1><p className="mt-2 text-stone-600">{tropaDeElite ? "Sem fase classificatória: cada confronto começa com um boi por competidor; empate leva à morte súbita." : "Chaveamento, resultado de cada boi e pedidos de revisão em um só lugar."}</p></header>
     {query.erro && <p role="alert" className="mt-5 rounded-lg bg-red-100 p-3 text-red-900">{errors[String(query.erro)] ?? "A operação não foi concluída. Confira sua função no evento e tente novamente."}</p>}
-    {error && <p role="alert" className="mt-5 rounded-lg bg-red-100 p-3 text-red-900">Não foi possível abrir a operação X1. Confira se sua função no evento permite operar.</p>}
+    {(error || categoriesError) && <p role="alert" className="mt-5 rounded-lg bg-red-100 p-3 text-red-900">Não foi possível abrir a operação X1. Confira se sua função no evento permite operar.</p>}
     <section className="mt-7 rounded-xl border bg-white p-5">
       <label htmlFor="categoria" className="block font-bold">Categoria</label>
       <form className="mt-2 flex flex-wrap gap-2"><input type="hidden" name="id" value={eventId}/><select id="categoria" name="categoria" defaultValue={categoryId} className="min-h-11 rounded-lg border px-3"><option value="">Selecione a categoria</option>{categories?.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}</select><button className="rounded-lg bg-stone-800 px-5 py-2 font-bold text-white">Abrir</button></form>

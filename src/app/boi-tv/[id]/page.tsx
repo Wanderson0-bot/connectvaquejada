@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Voltar } from "@/components/Voltar";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { updateBoiTvAttendance } from "../actions";
@@ -39,7 +39,7 @@ export default async function BoiTvEventQueue({ params, searchParams }: Props) {
   const attendances = (data ?? []) as Attendance[];
 
   return <main className="mx-auto min-h-screen max-w-6xl bg-stone-50 px-4 py-8 text-stone-900 sm:px-8">
-    <Link href="/boi-tv" className="text-sm text-stone-600 underline">Todos os eventos</Link>
+    {!user.is_anonymous && <Voltar />}
     <header className="mt-5"><p className="text-sm font-semibold uppercase tracking-wider text-amber-800">Central BOI TV</p><h1 className="mt-1 text-3xl font-black">{event.nome}</h1><p className="mt-2 text-stone-600">A tela recupera todos os pedidos pendentes deste evento ao abrir.</p></header>
     <CentralRealtime eventId={id}/>
     {erro === "atendimento" && <p role="alert" className="mt-5 rounded-lg bg-red-100 p-4 text-red-900">Não foi possível atualizar o atendimento. Confira o estado atual da solicitação e tente novamente.</p>}

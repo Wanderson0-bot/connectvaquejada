@@ -8,7 +8,7 @@ import {
   reativarCategoriaNoEscritorio,
 } from "./actions";
 
-type Categoria = { id: string; nome: string; ordem: number; valor_inscricao: number; ativa: boolean };
+type Categoria = { id: string; nome: string; ordem: number; valor_inscricao: number; ativa: boolean; modelo_competicao: string };
 const mensagensErro: Record<string, string> = {
   categoria: "Não foi possível salvar as alterações. Confira os dados e tente novamente.",
   "categoria-em-uso": "Esta categoria possui inscrições ou dados relacionados. Ela não foi excluída; oculte-a para preservar o histórico.",
@@ -38,7 +38,7 @@ export function CategoriasEscritorio({ eventoId, categorias, aberto, erro, suces
         <ul className="mt-5 divide-y rounded-xl border">{categorias.map((categoria) => <li key={categoria.id} className="flex flex-col gap-3 p-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <p className="break-words font-semibold">{categoria.nome}{!categoria.ativa && <span className="ml-2 text-xs font-normal text-gray-500">Oculta</span>}</p>
-            <p className="text-xs text-gray-500">Ordem {categoria.ordem} · R$ {Number(categoria.valor_inscricao).toFixed(2)}</p>
+            <p className="text-xs text-gray-500">{categoria.modelo_competicao === "eliminatoria" ? "Eliminatória" : "Classificatória com rodízio"} · Ordem {categoria.ordem} · R$ {Number(categoria.valor_inscricao).toFixed(2)}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <details className="relative">

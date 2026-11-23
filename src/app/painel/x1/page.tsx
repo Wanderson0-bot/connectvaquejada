@@ -1,3 +1,4 @@
+import { Voltar } from "@/components/Voltar";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowRight, Swords } from "lucide-react";
@@ -27,6 +28,7 @@ export default async function DisputaX1Page() {
   const events = [...byId.values()].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
 
   return <PainelShell active="x1">
+    <Voltar />
     <header className="dashboard-header">
       <div>
         <h1 className="dashboard-title">Disputa de X1</h1>

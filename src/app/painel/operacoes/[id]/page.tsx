@@ -154,6 +154,10 @@ export default async function OperacaoAdminPage({ params, searchParams }: Props)
   const eventActiveRound = ((eventActiveRoundData ?? []) as unknown as EventActiveRound[])[0] ?? null;
   const state = data as unknown as State | null;
   const { data: deviceContext } = await supabase.rpc("pista_ops_device_context", { p_evento_id: eventId });
+  const { data: modelos, error: modelosError } = categoryId
+    ? await supabase.rpc("pista_ops_categorias", { p_evento_id: eventId }).eq("id", categoryId).maybeSingle()
+    : { data: null, error: null };
+  const eliminatoria = (modelos as { modelo_competicao: string } | null)?.modelo_competicao === "eliminatoria";
   const category = state?.categorias.find((item) => item.id === categoryId);
   const roles = new Set(deviceContext?.funcao ? [String(deviceContext.funcao)] : (state?.minhas_funcoes ?? []));
   const canOperate = ["organizador", "escritorio", "locutor"].some((role) => roles.has(role));
@@ -201,12 +205,13 @@ export default async function OperacaoAdminPage({ params, searchParams }: Props)
           <h1 className="dashboard-title mt-3">Administração da operação</h1>
           <p className="dashboard-description">{state?.evento.nome ?? "Operação"}</p>
         </div>
-        {category && <Link href={`/eventos/${eventId}/pista-ops?categoria=${category.id}`} className="rounded-lg bg-orange-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-900">Abrir Locução</Link>}
+        {category && <Link href={`/eventos/${eventId}/pista-ops?categoria=${category.id}`} className="rounded-lg bg-orange-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-900">{eliminatoria ? "Abrir eliminatória" : "Abrir Locução"}</Link>}
       </header>
 
       {errorMessage && <p role="alert" className="mb-5 rounded-lg bg-red-50 p-4 text-sm text-red-900">{errorMessage}</p>}
       {successMessage && <p role="status" className="mb-5 rounded-lg bg-emerald-50 p-4 text-sm text-emerald-900">{successMessage}</p>}
       {stateError && <p role="alert" className="rounded-lg bg-amber-50 p-4 text-sm text-amber-950">Não foi possível carregar a operação. Confira se as migrations foram aplicadas e se o usuário tem acesso.</p>}
+      {modelosError && <p role="alert" className="mb-5 rounded-lg bg-red-50 p-4 text-sm text-red-900">Não foi possível carregar os modelos das categorias.</p>}
       {eventActiveRoundError && <p role="alert" className="mb-5 rounded-lg bg-amber-50 p-4 text-sm text-amber-950">Não foi possível verificar se outra categoria já tem um rodízio ativo. Atualize as migrations operacionais.</p>}
       {(morteSubitaError || roundTimesError || boiTvError) && <p role="alert" className="rounded-lg bg-amber-50 p-4 text-sm text-amber-950">Não foi possível carregar as configurações e os horários do rodízio.</p>}
 
@@ -247,7 +252,7 @@ export default async function OperacaoAdminPage({ params, searchParams }: Props)
                   <Link className="font-semibold underline" href={`/painel/operacoes/${eventId}?categoria=${eventActiveRound.categoria_id}`}>Abrir essa categoria</Link>
                 </p>
               )}
-              {(canOffice || canConfigureSuddenDeath) && (
+              {!eliminatoria && !modelosError && (canOffice || canConfigureSuddenDeath) && (
                 <Section title="Planejamento do rodízio">
                   {canConfigureSuddenDeath && <div className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-orange-200 bg-orange-50/70 p-4">
                     <div>

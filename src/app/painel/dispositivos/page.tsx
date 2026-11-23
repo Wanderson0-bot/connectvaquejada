@@ -1,3 +1,4 @@
+import { Voltar } from "@/components/Voltar";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ShieldCheck, Clock3, MonitorSmartphone } from "lucide-react";
@@ -49,6 +50,7 @@ export default async function DispositivosPage({ searchParams }: Props) {
   }
 
   return <PainelShell active="dispositivos">
+    <Voltar />
     <header className="dashboard-header"><div><h1 className="dashboard-title">Dispositivos autorizados</h1><p className="dashboard-description">Escolha uma operação ativa e libere Escritório ou Locução por QR code ou código temporário.</p></div></header>
     {query.erro && <p role="alert" className="mb-5 rounded-lg bg-red-50 p-4 text-sm text-red-800">Não foi possível concluir. Confirme sua permissão de organizador e os dados informados.</p>}
     {query.atualizado && <p role="status" className="mb-5 rounded-lg bg-emerald-50 p-4 text-sm text-emerald-900">O dispositivo foi atualizado.</p>}

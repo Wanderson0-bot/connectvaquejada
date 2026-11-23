@@ -46,10 +46,10 @@ begin
     select 1
       from information_schema.columns
      where table_schema = 'public'
-       and table_name = 'eventos'
-       and column_name = 'formato_competicao'
+       and table_name = 'categorias'
+       and column_name = 'modelo_competicao'
   ) then
-    raise exception 'TEST_SETUP_TROPA_ELITE_MISSING: apply the Tropa de Elite format migration separately';
+    raise exception 'TEST_SETUP_CATEGORY_MODEL_MISSING: apply the competition model migration separately';
   end if;
 end;
 $pista_ops_fixture_check$;
@@ -619,6 +619,7 @@ do $tropa_de_elite_tests$
 declare
   event_id constant uuid := '20000000-0000-4000-8000-000000000001';
   category_id constant uuid := '30000000-0000-4000-8000-000000000002';
+  classificatory_id constant uuid := '30000000-0000-4000-8000-000000000001';
   organizer_id constant uuid := '40000000-0000-4000-8000-000000000001';
   announcer_id constant uuid := '40000000-0000-4000-8000-000000000003';
   entry_a constant uuid := '60000000-0000-4000-8000-000000000006';
@@ -627,9 +628,11 @@ declare
   winner_id uuid;
   actual_message text;
 begin
-  update public.eventos
-     set formato_competicao = 'tropa_de_elite'
-   where id = event_id;
+  update public.categorias set nome = 'Tropa de Elite' where id = category_id;
+  if (select modelo_competicao from public.categorias where id = category_id) <> 'eliminatoria'
+    or (select modelo_competicao from public.categorias where id = classificatory_id) <> 'classificatoria' then
+    raise exception 'TEST_CATEGORY_MODELS_DO_NOT_COEXIST';
+  end if;
 
   insert into public.duplas(id, evento_id, categoria_id, numero_senha, puxador_id, status_pagamento, created_at)
   values
@@ -668,7 +671,12 @@ begin
     if actual_message <> 'PISTA_TROPA_ELITE_USES_X1' then raise; end if;
   end;
 
-  raise notice 'Tropa de Elite elimination: PASS (one bull per competitor; traditional rounds blocked)';
+  insert into public.pista_ops_rounds(evento_id, categoria_id, numero, quantidade_bois, criado_por)
+  select event_id, classificatory_id, coalesce(max(numero), 0) + 1, 1, organizer_id
+    from public.pista_ops_rounds
+   where evento_id = event_id and categoria_id = classificatory_id;
+
+  raise notice 'Mixed event: PASS (Tropa de Elite elimination and rounds in a classificatory category)';
 end;
 $tropa_de_elite_tests$;
 

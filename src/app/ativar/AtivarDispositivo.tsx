@@ -1,4 +1,5 @@
 "use client";
+import { Voltar } from "@/components/Voltar";
 
 import { useState, useSyncExternalStore, type FormEvent } from "react";
 import { Smartphone, ShieldCheck } from "lucide-react";
@@ -36,6 +37,7 @@ export function AtivarDispositivo({ estado, context }: { estado?: string; contex
   }
   return <main className="flex min-h-screen items-center justify-center bg-[#f8f4f0] px-4 py-8">
     <section className="w-full max-w-md rounded-3xl bg-white p-7 shadow-2xl shadow-stone-900/10 sm:p-9">
+      {!context && <Voltar href="/" />}
       <div className="mb-5 grid size-12 place-items-center rounded-2xl bg-orange-100 text-orange-800"><Smartphone /></div>
       <h1 className="text-2xl font-bold text-stone-900">Autorizar dispositivo</h1>
       <p className="mt-2 text-sm leading-6 text-stone-600">Informe o código para abrir o evento na função definida pelo organizador.</p>

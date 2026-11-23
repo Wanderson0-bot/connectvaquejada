@@ -95,7 +95,7 @@ export default async function PistaPage({ params, searchParams }: Props) {
 
   const { data: evento, error: erroEvento } = await supabase
     .from("eventos")
-    .select("id, nome, formato_competicao")
+    .select("id, nome")
     .eq("id", eventoId)
     .eq("parque_id", perfil.parque_id)
     .maybeSingle();
@@ -108,20 +108,9 @@ export default async function PistaPage({ params, searchParams }: Props) {
   if (!evento) {
     notFound();
   }
-  if (evento.formato_competicao === "tropa_de_elite") {
-    return <main className="mx-auto min-h-screen max-w-5xl bg-stone-50 px-4 py-10 sm:px-8">
-      <Link href={`/eventos/${eventoId}`} className="text-sm text-stone-600 underline">Voltar ao evento</Link>
-      <section className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-5">
-        <h1 className="text-2xl font-bold text-emerald-950">Tropa de Elite · fase eliminatória</h1>
-        <p className="mt-2 text-emerald-950">A Pista de rodízios não se aplica a este formato. Use o chaveamento para disputar diretamente a fase eliminatória.</p>
-        <Link href={`/eventos/${eventoId}/x1`} className="mt-4 inline-flex rounded-lg bg-emerald-800 px-5 py-3 font-bold text-white">Abrir chave eliminatória</Link>
-      </section>
-    </main>;
-  }
-
   const { data: categorias, error: erroCategorias } = await supabase
     .from("categorias")
-    .select("id, nome, ordem")
+    .select("id, nome, ordem, modelo_competicao")
     .eq("evento_id", evento.id)
     .order("ordem", { ascending: true });
 
@@ -132,6 +121,9 @@ export default async function PistaPage({ params, searchParams }: Props) {
   const categoria = categorias?.find(
     (item) => item.id === categoriaSelecionada
   );
+  if (categoria?.modelo_competicao === "eliminatoria") {
+    redirect(`/eventos/${eventoId}/x1?categoria=${categoria.id}`);
+  }
   const categoriaId = categoria?.id;
   let autorizado = false;
   let podeOrganizar = false;
