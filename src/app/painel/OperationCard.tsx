@@ -69,9 +69,8 @@ export function OperationCard({ operation, podeSupervisionar }: { operation: Ope
     </div>
 
     <div className="p-5 sm:p-6">
-      {podeSupervisionar && <Link href={`/eventos/${operation.id}/supervisao-equipe`} className="operation-primary mb-3">Central da Equipe</Link>}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Link href={`/painel/operacoes/${operation.id}`} className="operation-secondary"><Settings2 className="size-4" aria-hidden="true" /> Administrar</Link>
+        {podeSupervisionar && <Link href={`/eventos/${operation.id}/supervisao-equipe`} className="operation-secondary"><Settings2 className="size-4" aria-hidden="true" /> Central da Equipe</Link>}
         <Link href={`/eventos/${operation.id}/duplas`} className="operation-secondary"><Ticket className="size-4" aria-hidden="true" /> Escritório</Link>
         <Link href={`/eventos/${operation.id}/pista-ops`} className="operation-primary"><Mic className="size-4" aria-hidden="true" /> Locução</Link>
       </div>

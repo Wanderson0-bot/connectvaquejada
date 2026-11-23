@@ -25,7 +25,7 @@ function pageUrl(scope: Scope, status?: { error?: string; success?: string }) {
   if (status?.error) query.set("erro", status.error);
   if (status?.success) query.set("sucesso", status.success);
   const path = scope.returnToPanel
-    ? `/painel/operacoes/${encodeURIComponent(scope.eventId)}`
+    ? `/eventos/${encodeURIComponent(scope.eventId)}/supervisao-equipe`
     : `/eventos/${encodeURIComponent(scope.eventId)}/pista-ops`;
   return `${path}?${query}`;
 }
@@ -49,10 +49,12 @@ function errorKey(error: DbError): string {
   return "operacao";
 }
 
-async function requireUser() {
+async function requireUser(eventId: string) {
   const supabase = await createClient();
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) redirect("/");
+  const { data: permitido } = await supabase.rpc("connect_pode_supervisionar", { p_evento_id: eventId });
+  if (permitido !== true) redirect("/painel");
   return supabase;
 }
 
@@ -62,7 +64,7 @@ function finish(scope: Scope, error: DbError, success: string, hasData = true): 
     redirect(pageUrl(scope, { error: errorKey(error) }));
   }
   revalidatePath(`/eventos/${scope.eventId}/pista-ops`);
-  revalidatePath(`/painel/operacoes/${scope.eventId}`);
+  revalidatePath(`/eventos/${scope.eventId}/supervisao-equipe`);
   revalidatePath(`/eventos/${scope.eventId}`);
   redirect(pageUrl(scope, { success }));
 }
@@ -75,7 +77,7 @@ export async function planejarRodizio(formData: FormData) {
   const scope = readScope(formData);
   const bulls = Number(formData.get("quantidade_bois"));
   if (!Number.isSafeInteger(bulls) || bulls < 1) finish(scope, null, "", false);
-  const supabase = await requireUser();
+  const supabase = await requireUser(scope.eventId);
   const { data, error } = await supabase.rpc("pista_ops_planejar_rodizio", {
     p_evento_id: scope.eventId,
     p_categoria_id: scope.categoryId,
@@ -88,7 +90,7 @@ export async function iniciarRodizio(formData: FormData) {
   const scope = readScope(formData);
   const roundId = String(formData.get("rodizio_id") ?? "");
   if (!validId(roundId)) finish(scope, null, "", false);
-  const supabase = await requireUser();
+  const supabase = await requireUser(scope.eventId);
   const { data, error } = await supabase.rpc("pista_ops_iniciar_rodizio", { p_rodizio_id: roundId });
   finish(scope, error, "iniciado", Boolean(data));
 }
@@ -97,7 +99,7 @@ export async function configurarMorteSubita(formData: FormData) {
   const scope = readScope(formData);
   const rawValue = String(formData.get("morte_subita") ?? "");
   if (!["true", "false"].includes(rawValue)) finish(scope, null, "", false);
-  const supabase = await requireUser();
+  const supabase = await requireUser(scope.eventId);
   const { data, error } = await supabase.rpc("pista_ops_configurar_morte_subita", {
     p_evento_id: scope.eventId,
     p_ativada: rawValue === "true",
@@ -109,7 +111,7 @@ export async function configurarBoiTv(formData: FormData) {
   const scope = readScope(formData);
   const raw = String(formData.get("boi_tv") ?? "");
   if (!['true','false'].includes(raw)) finish(scope, null, "", false);
-  const supabase = await requireUser();
+  const supabase = await requireUser(scope.eventId);
   const { data, error } = await supabase.rpc("pista_ops_boi_tv_configurar", {
     p_evento_id: scope.eventId, p_habilitado: raw === "true",
   });
@@ -124,7 +126,7 @@ export async function decidirBoiTv(formData: FormData) {
   const score = Number(rawScore);
   const justification = String(formData.get("justificativa") ?? "").trim();
   if (!validId(reviewId) || !["zero","valeu_boi"].includes(result) || !Number.isFinite(score) || score < 0 || score > 40 || (result === "zero" && score !== 0) || justification.length < 3) finish(scope, null, "", false);
-  const supabase = await requireUser();
+  const supabase = await requireUser(scope.eventId);
   const { data, error } = await supabase.rpc("pista_ops_boi_tv_decidir", {
     p_revisao_id: reviewId, p_resultado: result, p_pontuacao: score, p_justificativa: justification,
   });
@@ -135,7 +137,7 @@ export async function liberarRetorno(formData: FormData) {
   const scope = readScope(formData);
   const queueItemId = String(formData.get("item_fila_id") ?? "");
   if (!validId(queueItemId)) finish(scope, null, "", false);
-  const supabase = await requireUser();
+  const supabase = await requireUser(scope.eventId);
   const { data, error } = await supabase.rpc("pista_ops_liberar_retorno", { p_item_fila_id: queueItemId });
   if (error || !data || typeof data !== "object" || !("status" in data)) finish(scope, error, "", false);
   finish(scope, null, (data as { status: string }).status === "liberado" ? "retorno-liberado" : "aguardando");
@@ -146,7 +148,7 @@ export async function registrarRaboDaGata(formData: FormData) {
   const roundId = String(formData.get("rodizio_id") ?? "");
   const entryId = String(formData.get("dupla_id") ?? "");
   if (!validId(roundId) || !validId(entryId)) finish(scope, null, "", false);
-  const supabase = await requireUser();
+  const supabase = await requireUser(scope.eventId);
   const { data, error } = await supabase.rpc("pista_ops_rabo_da_gata", {
     p_rodizio_id: roundId,
     p_dupla_id: entryId,
@@ -160,7 +162,7 @@ export async function substituirDupla(formData: FormData) {
   const queueItemId = String(formData.get("item_fila_id") ?? "");
   const competitorId = String(formData.get("competidor_id") ?? "");
   if (!validId(queueItemId) || !validId(competitorId)) finish(scope, null, "", false);
-  const supabase = await requireUser();
+  const supabase = await requireUser(scope.eventId);
   const { data, error } = await supabase.rpc("pista_ops_substituir_dupla", {
     p_item_fila_id: queueItemId,
     p_competidor_id: competitorId,
@@ -178,7 +180,7 @@ export async function corrigirResultado(formData: FormData) {
   if (!validId(runId) || !["zero", "valeu_boi"].includes(result) || !rawScore || !Number.isFinite(score) || score < 0 || (result === "valeu_boi" && score > 40) || (result === "zero" && score !== 0) || !reason) {
     finish(scope, null, "", false);
   }
-  const supabase = await requireUser();
+  const supabase = await requireUser(scope.eventId);
   const { data, error } = await supabase.rpc("pista_ops_corrigir_resultado", {
     p_corrida_id: runId,
     p_resultado: result,
@@ -191,7 +193,7 @@ export async function corrigirResultado(formData: FormData) {
 export async function configurarSubstituicao(formData: FormData) {
   const scope = readScope(formData);
   const allow = String(formData.get("permitir_substituicao") ?? "") === "true";
-  const supabase = await requireUser();
+  const supabase = await requireUser(scope.eventId);
   const { data, error } = await supabase.rpc("pista_ops_configurar_substituicao", {
     p_evento_id: scope.eventId,
     p_permitir: allow,
@@ -209,7 +211,7 @@ export async function salvarPremiacao(formData: FormData) {
     finish(scope, null, "", false);
   }
   if (!Array.isArray(places)) finish(scope, null, "", false);
-  const supabase = await requireUser();
+  const supabase = await requireUser(scope.eventId);
   const { data, error } = await supabase.rpc("pista_ops_salvar_premiacao", {
     p_evento_id: scope.eventId,
     p_categoria_id: scope.categoryId,
@@ -224,7 +226,7 @@ export async function registrarEmpate(formData: FormData) {
   const decision = String(formData.get("decisao") ?? "").trim();
   const terms = String(formData.get("termos") ?? "").trim();
   if (participants.length < 2 || participants.some((id) => !validId(id)) || !decision || !terms) finish(scope, null, "", false);
-  const supabase = await requireUser();
+  const supabase = await requireUser(scope.eventId);
   const { data, error } = await supabase.rpc("pista_ops_registrar_empate", {
     p_evento_id: scope.eventId,
     p_categoria_id: scope.categoryId,

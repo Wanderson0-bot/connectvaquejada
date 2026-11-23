@@ -47,7 +47,7 @@ function finish(scope: Scope, error: DbError, success: string, hasData = true): 
     redirect(pageUrl(scope, { error: errorKey(error) }));
   }
   revalidatePath(`/eventos/${scope.eventId}/pista-ops`);
-  revalidatePath(`/painel/operacoes/${scope.eventId}`);
+  revalidatePath(`/eventos/${scope.eventId}/supervisao-equipe`);
   redirect(pageUrl(scope, { success }));
 }
 

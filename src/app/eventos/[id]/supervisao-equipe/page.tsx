@@ -7,6 +7,7 @@ import { Classificacao } from "@/components/supervisao/Classificacao";
 import { carregarSupervisao } from "@/lib/supervisao/servidor";
 import { funcoes, horarioEvento, rotulo, statusEvento, uuid } from "@/lib/supervisao/modelo";
 import { alterarStatus } from "./actions";
+import { AdministracaoCategoria } from "./AdministracaoCategoria";
 
 const acoes = {
   iniciar: "Iniciar", pausar: "Pausar", retomar: "Retomar", concluir: "Concluir", anular: "Anular",
@@ -54,7 +55,7 @@ export default async function SupervisaoPage({ params, searchParams }: PageProps
         </div>
       </header>
 
-      {query.erro && <p role="alert" className="rounded-lg bg-red-100 p-3 text-red-900">A ação não foi concluída. Confira o estado atual do evento.</p>}
+      {query.erro === "1" && <p role="alert" className="rounded-lg bg-red-100 p-3 text-red-900">A ação não foi concluída. Confira o estado atual do evento.</p>}
       {query.atualizado && <p role="status" className="rounded-lg bg-emerald-100 p-3 text-emerald-900">Estado da vaquejada atualizado.</p>}
       {disponiveis.length > 0 && <section className={painel} aria-labelledby="ciclo-evento">
         <h2 id="ciclo-evento" className="text-lg font-bold">Ciclo da vaquejada</h2>
@@ -111,6 +112,13 @@ export default async function SupervisaoPage({ params, searchParams }: PageProps
           </section>)}
         </div>}
       </section>
+
+      {categoria && evento.status === "em_andamento" && <AdministracaoCategoria
+        eventId={id}
+        categoryId={categoria.id}
+        erro={typeof query.erro === "string" && query.erro !== "1" ? query.erro : undefined}
+        sucesso={typeof query.sucesso === "string" ? query.sucesso : undefined}
+      />}
 
       <div className="grid gap-5 xl:grid-cols-2">
         <section className={painel} aria-labelledby="equipe">
