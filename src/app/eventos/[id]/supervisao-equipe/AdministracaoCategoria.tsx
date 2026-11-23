@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { ConfirmForm } from "@/components/ConfirmForm";
+import { CorridasPorSenha } from "./CorridasPorSenha";
 import {
   configurarMorteSubita,
   iniciarRodizio,
@@ -99,10 +100,13 @@ function HiddenScope({ eventId, categoryId }: { eventId: string; categoryId: str
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, badge, children }: { title: string; badge?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="border-t border-stone-200 py-6">
-      <h2 className="text-lg font-semibold text-stone-950">{title}</h2>
+    <section className="min-w-0 rounded-xl border border-stone-200 bg-white p-4 sm:p-5">
+      <header className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-base font-semibold text-stone-950">{title}</h3>
+        {badge}
+      </header>
       <div className="mt-4">{children}</div>
     </section>
   );
@@ -112,9 +116,12 @@ function SubmitButton({ children }: { children: React.ReactNode }) {
   return <button className="inline-flex min-h-10 items-center justify-center rounded-md bg-emerald-900 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800">{children}</button>;
 }
 
-function scoreLabel(score: number | null) {
-  return score === null ? "Sem pontuação" : `${score} pontos`;
-}
+const statusRodizio: Record<string, string> = {
+  ativo: "Em andamento",
+  aguardando_proximo_rodizio: "Aguardando próximo rodízio",
+  planejado: "Planejado",
+  finalizado: "Finalizado",
+};
 
 function formatarHorario(value: string | null) {
   return value
@@ -182,17 +189,27 @@ export async function AdministracaoCategoria({ eventId, categoryId, erro, sucess
     .filter((round) => round.estado === "planejado")
     .sort((left, right) => left.numero - right.numero)[0];
   const waitingRound = rodizios.find((round) => round.estado === "aguardando_proximo_rodizio");
-  const allRuns = rodizios.flatMap((round) =>
-    round.corridas.map((run) => ({ ...run, roundNumber: round.numero })),
-  ) ?? [];
+  const rodiziosRecentes = [...rodizios].sort((a, b) => b.numero - a.numero);
+  const rodizioAtual = activeRound ?? waitingRound ?? nextPlannedRound ?? rodiziosRecentes[0];
+  const podePlanejar = !activeRound && !waitingRound && !nextPlannedRound && !eventActiveRound;
   const errorMessage = erro ? errorMessages[erro] ?? "A operação falhou. Nenhum sucesso foi registrado." : null;
   const successMessage = sucesso ? successMessages[sucesso] : null;
 
   return (
     <section aria-labelledby="administracao-categoria" className="space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="administracao-categoria" className="text-lg font-bold">Administrar categoria</h2>
-        {category && <Link href={`/eventos/${eventId}/pista-ops?categoria=${category.id}`} className="operation-secondary">{eliminatoria ? "Abrir eliminatória" : "Abrir Locução"}</Link>}
+      <header className="flex flex-wrap items-start justify-between gap-4 rounded-xl border border-stone-200 bg-white p-4 sm:p-5">
+        <div>
+          <h2 id="administracao-categoria" className="text-xl font-bold text-stone-950">Administrar categoria</h2>
+          {category && <p className="mt-1 text-base font-semibold text-stone-700">{category.nome}</p>}
+          {rodizioAtual && <p className="mt-2 inline-flex rounded-full bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-900">
+            Rodízio #{rodizioAtual.numero} · {statusRodizio[rodizioAtual.estado] ?? rodizioAtual.estado.replaceAll("_", " ")}
+          </p>}
+          {category && !rodizioAtual && !eliminatoria && <p className="mt-2 text-sm text-stone-600">Sem rodízio nesta categoria</p>}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {category && <Link href={`/eventos/${eventId}/pista-ops?categoria=${category.id}`} className="operation-primary">{eliminatoria ? "Abrir eliminatória" : "Abrir Locução"}</Link>}
+          <Link href="/painel" className="operation-secondary">Membros e funções</Link>
+        </div>
       </header>
 
       {errorMessage && <p role="alert" className="mb-5 rounded-lg bg-red-50 p-4 text-sm text-red-900">{errorMessage}</p>}
@@ -204,53 +221,46 @@ export async function AdministracaoCategoria({ eventId, categoryId, erro, sucess
 
       {!stateError && state && categoryId && !category && <p role="alert" className="rounded-lg bg-red-50 p-4 text-sm text-red-900">A categoria não pertence a esta operação.</p>}
       {!stateError && state && categoryId && category && (
-        <section className="rounded-2xl bg-white px-5 shadow-lg shadow-orange-950/5 sm:px-7">
-          <div className="flex flex-wrap items-center justify-between gap-3 py-5">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wide text-orange-800">Categoria</p>
-              <h2 className="text-xl font-bold text-stone-950">{category.nome}</h2>
-            </div>
-            <Link href="/painel" className="text-sm font-semibold text-stone-600 underline">Membros e funções</Link>
-          </div>
+        <div className="space-y-4">
           {!canOperate ? (
             <p role="alert" className="border-t border-stone-200 py-5 text-sm text-amber-900">Seu usuário não tem uma função ativa da Pista neste evento.</p>
           ) : (
             <>
               {eventActiveRound && eventActiveRound.categoria_id !== categoryId && (
-                <p role="status" className="border-t border-amber-200 bg-amber-50 py-4 text-sm text-amber-950">
+                <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
                   O rodízio #{eventActiveRound.numero} da categoria {eventActiveRound.categoria_nome} está {eventActiveRound.estado === "ativo" ? "em andamento" : "aguardando o próximo rodízio"}. Este evento permite um rodízio por vez.{" "}
                   <Link className="font-semibold underline" href={`/eventos/${eventId}/supervisao-equipe?categoria=${eventActiveRound.categoria_id}`}>Abrir essa categoria</Link>
                 </p>
               )}
+              <div className={`grid items-start gap-4 ${eliminatoria ? "" : "lg:grid-cols-2"}`}>
               {!eliminatoria && !modelosError && (canOffice || canConfigureSuddenDeath) && (
-                <Section title="Planejamento do rodízio">
-                  {canConfigureSuddenDeath && <div className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-orange-200 bg-orange-50/70 p-4">
-                    <div>
-                      <p className="font-semibold text-stone-950">Morte súbita · {morteSubitaAtiva ? "Ativada" : "Desativada"}</p>
-                      <p className="mt-1 max-w-2xl text-sm text-stone-700">
-                        {morteSubitaAtiva
-                          ? "A segunda corrida só é liberada se a primeira valer; se der Zero, a senha perde o direito."
-                          : "A segunda corrida é liberada após a primeira, mesmo se der Zero."}
-                        {" "}Se a primeira corrida tiver retorno, a segunda fica para o próximo rodízio.
-                      </p>
-                    </div>
-                    {!morteSubitaError && (
-                      <form action={configurarMorteSubita}>
-                        <HiddenScope eventId={eventId} categoryId={categoryId} />
-                        <input type="hidden" name="morte_subita" value={morteSubitaAtiva ? "false" : "true"} />
-                        <button className="min-h-10 rounded-lg bg-[#87320a] px-4 py-2 text-sm font-semibold text-white hover:bg-[#6f2808]">
-                          {morteSubitaAtiva ? "Desativar morte súbita" : "Ativar morte súbita"}
-                        </button>
-                      </form>
-                    )}
-                  </div>}
-                  {canOffice && !activeRound && !waitingRound && !nextPlannedRound && !eventActiveRound && (
-                    <form action={planejarRodizio} className="flex flex-wrap items-end gap-3">
+                <Section title="Planejamento do rodízio" badge={canConfigureSuddenDeath && !morteSubitaError && (
+                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${morteSubitaAtiva ? "bg-emerald-100 text-emerald-900" : "bg-stone-100 text-stone-700"}`}>
+                    Morte súbita: {morteSubitaAtiva ? "Ativada" : "Desativada"}
+                  </span>
+                )}>
+                  {canConfigureSuddenDeath && !morteSubitaError && <div className="mb-5 rounded-lg bg-stone-50 p-3">
+                    <p className="text-sm text-stone-700">
+                      {morteSubitaAtiva ? "Zero na primeira corrida elimina o direito à segunda." : "Mesmo com Zero na primeira corrida, a segunda é liberada."}
+                      {" "}Se houver Retorno na primeira, a segunda fica para o próximo rodízio.
+                    </p>
+                    <form action={configurarMorteSubita} className="mt-3">
                       <HiddenScope eventId={eventId} categoryId={categoryId} />
-                      <label className="grid gap-1 text-sm font-medium">Quantidade de bois
-                        <input name="quantidade_bois" type="number" min="1" step="1" required className="h-10 w-40 rounded-md border border-stone-300 px-3" />
-                      </label>
-                      <SubmitButton>Planejar rodízio</SubmitButton>
+                      <input type="hidden" name="morte_subita" value={morteSubitaAtiva ? "false" : "true"} />
+                      <button className="operation-secondary">{morteSubitaAtiva ? "Desativar morte súbita" : "Ativar morte súbita"}</button>
+                    </form>
+                  </div>}
+                  {canOffice && (
+                    <form action={planejarRodizio}>
+                      <fieldset disabled={!podePlanejar} className="grid min-w-0 items-end gap-2 disabled:opacity-60 sm:grid-cols-[minmax(0,1fr)_auto]">
+                        <HiddenScope eventId={eventId} categoryId={categoryId} />
+                        <label className="grid gap-1 text-sm font-medium">Quantidade de bois
+                          <input name="quantidade_bois" type="number" min="1" step="1" required aria-describedby="quantidade-bois-ajuda"
+                            className="h-10 w-full min-w-0 rounded-md border border-stone-300 px-3" />
+                        </label>
+                        <SubmitButton>Planejar rodízio</SubmitButton>
+                        <p id="quantidade-bois-ajuda" className="text-xs text-stone-600 sm:col-span-2">Informe um número inteiro maior que zero.</p>
+                      </fieldset>
                     </form>
                   )}
                   {canOffice && activeRound && <p className="mb-3 text-sm text-stone-600">A liberação da segunda corrida segue o modo de morte súbita acima. Retornos da primeira corrida permanecem neste rodízio.</p>}
@@ -262,10 +272,40 @@ export async function AdministracaoCategoria({ eventId, categoryId, erro, sucess
                     </ConfirmForm>
                   )}
                   {canOffice && activeRound && <p className="mt-3 text-sm text-stone-600">Uma chamada ocupa uma única posição. O Rabo da Gata só ocupa posição após ser chamado.</p>}
-                  {canOffice && !activeRound && !nextPlannedRound && <p className="text-sm text-stone-600">Nenhum rodízio planejado. Defina uma quantidade de bois para iniciar.</p>}
-                  {canOperate && waitingRound && <p role="status" className="mt-3 text-sm font-medium text-amber-900">Rodízio #{waitingRound.numero} aguardando próximo rodízio planejado. Nenhuma corrida foi descartada.</p>}
+
+                  {canOperate && waitingRound && <footer className="mt-5 border-t border-stone-200 pt-3">
+                    <p role="status" className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                      Rodízio #{waitingRound.numero} aguardando próximo rodízio planejado. Nenhuma corrida foi descartada.
+                    </p>
+                  </footer>}
                 </Section>
               )}
+
+              {canOffice && boiTvState && (
+                <Section title="Boi de TV">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="rounded-full bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-900">No evento: {boiTvState.habilitado ? "Disponível" : "Desativado"}</p>
+                    {canOrganize && <form action={configurarBoiTv}>
+                      <HiddenScope eventId={eventId} categoryId={category.id} />
+                      <input type="hidden" name="boi_tv" value={boiTvState.habilitado ? "false" : "true"} />
+                      <SubmitButton>{boiTvState.habilitado ? "Desativar no evento" : "Ativar no evento"}</SubmitButton>
+                    </form>}
+                  </div>
+                  <p className="mt-3 text-sm text-stone-600">A configuração vale para todo o evento. A decisão da análise atualiza o resultado válido para a classificação.</p>
+                  {boiTvState.habilitado && <div className="mt-4 flex flex-wrap gap-2">
+                    {canOrganize && <Link href={`/painel/dispositivos?evento=${eventId}&funcao=boi_tv`} className="operation-secondary">Autorizar dispositivo BOI TV</Link>}
+                    <Link href={`/boi-tv/${eventId}`} className="operation-secondary">Abrir central BOI TV do evento</Link>
+                  </div>}
+                  <a href="#historico-analises-categoria" className="mt-4 inline-flex text-sm font-semibold text-orange-900 underline">
+                    Histórico da categoria · {boiTvState.revisoes.filter(({ estado }) => estado === "em_analise").length} em análise · {boiTvState.revisoes.filter(({ estado }) => estado === "decidido").length} decididas
+                  </a>
+                </Section>
+              )}
+              </div>
+
+              <Section title="Corridas registradas">
+                <CorridasPorSenha key={categoryId} rodizios={rodiziosRecentes} rodizioInicial={rodizioAtual?.id} />
+              </Section>
 
               {activeRound && (
                 <>
@@ -323,44 +363,23 @@ export async function AdministracaoCategoria({ eventId, categoryId, erro, sucess
                 </>
               )}
 
-              <Section title="Corridas registradas">
-                {allRuns.length ? (
-                  <ul className="divide-y divide-stone-200 border-y border-stone-200">
-                    {allRuns.map((run) => (
-                      <li key={run.id} className="grid gap-4 py-4 lg:grid-cols-[minmax(12rem,1fr)_minmax(18rem,2fr)]">
-                        <div className="text-sm">
-                          <p className="font-semibold">Rodízio #{run.roundNumber} · Senha {run.numero_senha} · Corrida {run.numero_corrida}</p>
-                          <p className="mt-1 text-stone-600">{run.estado === "retorno_pendente" ? "Retorno pendente" : run.estado === "em_curso" ? "Em curso" : run.estado === "valeu_boi" ? `Valeu Boi · ${scoreLabel(run.pontuacao)}` : run.estado === "zero" ? "Zero" : run.estado === "sem_direito" ? "Sem direito à 2ª corrida" : "Pendente"}</p>
-                        </div>
-                      </li>
-                    ))}
+              {rodizios.length > 0 && (
+                <Section title="Rodízios da categoria">
+                  <ul className="divide-y divide-stone-200">
+                    {rodiziosRecentes.map((round) => <li key={round.id} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2 text-sm">
+                      <p className="font-semibold">#{round.numero} · {round.quantidade_bois} bois · {statusRodizio[round.estado] ?? round.estado.replaceAll("_", " ")}</p>
+                      <p className="mt-1 text-xs text-stone-600">Início: {formatarHorario(round.iniciado_em)}</p>
+                      <p className="text-xs text-stone-600">Término: {round.terminado_em ? formatarHorario(round.terminado_em) : round.estado === "ativo" ? "Em andamento" : "—"}</p>
+                    </li>)}
                   </ul>
-                ) : <p className="text-sm text-stone-600">Nenhuma corrida foi registrada ainda.</p>}
-              </Section>
+                </Section>
+              )}
 
-              {canOffice && category && boiTvState && (
-                <Section title="Boi de TV · análise alternativa">
-                  <div className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
-                    <div>
-                      <p className="font-semibold">Recurso no evento · {boiTvState.habilitado ? "Disponível" : "Desativado"}</p>
-                      <p className="mt-1 text-sm text-stone-700">Quando ativado, a locução pode encaminhar um resultado para análise e a decisão fica registrada no histórico da corrida.</p>
-                    </div>
-                    {canOrganize && <form action={configurarBoiTv}>
-                      <HiddenScope eventId={eventId} categoryId={category.id} />
-                      <input type="hidden" name="boi_tv" value={boiTvState.habilitado ? "false" : "true"} />
-                      <SubmitButton>{boiTvState.habilitado ? "Desativar no evento" : "Ativar no evento"}</SubmitButton>
-                    </form>}
-                  </div>
-                  <p className="mb-3 text-sm text-stone-600">O ajuste vale para todas as categorias do evento. Cada solicitação guarda o julgamento inicial; o resultado da alternativa passa a ser o resultado válido para a classificação.</p>
-                  {canOrganize && boiTvState.habilitado && <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-4">
-                    <p className="font-semibold">Acesso da equipe terceirizada</p>
-                    <p className="mt-1 text-sm text-stone-700">Gere um QR code BOI TV na área Dispositivos autorizados. O acesso ficará vinculado a este evento e poderá ser revogado por dispositivo.</p>
-                    <Link href={`/painel/dispositivos?evento=${eventId}&funcao=boi_tv`} className="mt-3 inline-flex rounded-lg bg-amber-800 px-4 py-2 font-semibold text-white">Autorizar dispositivo BOI TV</Link>
-                  </div>}
-                  {boiTvState.habilitado && <Link className="mb-4 inline-flex rounded-lg border border-amber-700 px-4 py-2 font-semibold text-amber-950" href={`/boi-tv/${eventId}`}>Abrir central BOI TV do evento</Link>}
-                  <h3 className="font-semibold">Histórico de análises</h3>
-                  {boiTvState.revisoes.length ? <ul className="mt-3 divide-y rounded-lg border">
-                    {boiTvState.revisoes.map((review) => <li key={review.id} className="p-4">
+              <div id="historico-analises-categoria" className="scroll-mt-4">
+              {canOffice && boiTvState && (
+                <Section title="Histórico de análises">
+                  {boiTvState.revisoes.length ? <ul className="divide-y divide-stone-200">
+                    {boiTvState.revisoes.map((review) => <li key={review.id} className="py-3">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div><p className="font-semibold">Senha {review.senha} · Corrida {review.numero_corrida}{review.vaqueiro ? ` · ${review.vaqueiro}` : ""}</p><p className="mt-1 text-sm text-stone-600">{review.tipo_solicitacao === "a_favor" ? "Boi a favor" : "Boi contra/de terceiro"} · Solicitante: Senha {review.reclamante_senha}{review.reclamante ? ` (${review.reclamante})` : ""}</p><p className="mt-1 text-sm text-stone-600">Julgamento inicial: {review.resultado_inicial === "zero" ? "Zero" : `Valeu Boi · ${review.pontuacao_inicial} pontos`} · {review.estado === "em_analise" ? "Em análise" : `Decisão: ${review.resultado_alternativa === "zero" ? "Zero" : `Valeu Boi · ${review.pontuacao_alternativa} pontos`}`}</p></div>
                         <time className="text-xs text-stone-500">Solicitado em {formatarHorario(review.solicitada_em)}</time>
@@ -371,21 +390,10 @@ export async function AdministracaoCategoria({ eventId, categoryId, erro, sucess
                 </Section>
               )}
 
-              {rodizios.length > 0 && (
-                <Section title="Rodízios da categoria">
-                  <ul className="flex flex-wrap gap-2">
-                    {rodizios.map((round) => <li key={round.id} className="min-w-64 rounded-md border border-stone-300 px-3 py-2 text-sm">
-                      <p className="font-semibold">#{round.numero} · {round.quantidade_bois} bois · {round.estado.replaceAll("_", " ")}</p>
-                      <p className="mt-1 text-xs text-stone-600">Início: {formatarHorario(round.iniciado_em)}</p>
-                      <p className="text-xs text-stone-600">Término: {round.terminado_em ? formatarHorario(round.terminado_em) : round.estado === "ativo" ? "Em andamento" : "—"}</p>
-                    </li>)}
-                  </ul>
-                </Section>
-              )}
-
+              </div>
             </>
           )}
-        </section>
+        </div>
       )}
     </section>
   );

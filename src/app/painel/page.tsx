@@ -1,12 +1,12 @@
 import { Voltar } from "@/components/Voltar";
-import Link from "next/link";
 import { Flag, Plus } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PainelShell } from "@/components/PainelShell";
 import { iniciarOperacao } from "./operacoes/actions";
 import { OperationCard } from "./OperationCard";
-import { statusEvento, type Evento } from "@/lib/supervisao/modelo";
+import type { Evento } from "@/lib/supervisao/modelo";
+import { CentraisEquipe } from "./CentraisEquipe";
 
 type Operacao = { id: string; nome: string; data: string; status_operacional: string; quantidade_inscricoes: number; quantidade_dispositivos: number };
 type Membro = { id: string; usuario_id: string; funcao: string };
@@ -27,6 +27,23 @@ export default async function PainelPage({ searchParams }: Props) {
   const eventosComCentral = new Set(eventosSupervisionados.map((evento) => evento.id));
   const operacoesAtivas = new Set(operacoes.map((operacao) => operacao.id));
   const outrasCentrais = eventosSupervisionados.filter((evento) => !operacoesAtivas.has(evento.id));
+  const lotesCentrais = Array.from({ length: Math.ceil(outrasCentrais.length / 100) }, (_, indice) =>
+    outrasCentrais.slice(indice * 100, (indice + 1) * 100).map(({ id }) => id));
+  const [metadadosCentrais, parques] = await Promise.all([
+    Promise.all(lotesCentrais.map((ids) => supabase.from("eventos").select("id,parque_id,operacao_temporaria").in("id", ids))),
+    outrasCentrais.length ? supabase.rpc("painel_listar_parques") : { data: [] },
+  ]);
+  const metadadosPorId = new Map(metadadosCentrais.flatMap(({ data }) => (data ?? []).map((evento) => [evento.id, evento] as const)));
+  const nomesParques = new Map(((parques.data ?? []) as { id: string; nome: string }[]).map(({ id, nome }) => [id, nome]));
+  const centrais = outrasCentrais.map((evento) => {
+    const metadados = metadadosPorId.get(evento.id);
+    const local = metadados?.operacao_temporaria
+      ? "Operação temporária"
+      : nomesParques.get(metadados?.parque_id ?? "") ?? "Parque indisponível";
+    return { ...evento, local };
+  });
+  const encerradas = centrais.filter(({ status }) => status === "concluido" || status === "cancelado");
+  const outrasOperacoes = centrais.filter(({ status }) => status !== "concluido" && status !== "cancelado");
   const { data: horarios, error: horariosError } = operacoes.length
     ? await supabase.from("eventos").select("id,created_at").in("id", operacoes.map((op) => op.id))
     : { data: [] as { id: string; created_at: string }[], error: null };
@@ -86,14 +103,7 @@ export default async function PainelPage({ searchParams }: Props) {
       {operacoesComMembros.map((operacao) => <OperationCard key={operacao.id} operation={operacao} podeSupervisionar={eventosComCentral.has(operacao.id)} />)}
       {!error && operacoes.length === 0 && <p className="dashboard-empty-state text-stone-600">Nenhuma operação disponível. Inicie uma acima para abrir o escritório e a locução.</p>}
     </section>
-    {outrasCentrais.length > 0 && <section aria-labelledby="centrais-equipe" className="mt-8">
-      <h2 id="centrais-equipe" className="text-xl font-bold tracking-tight text-stone-900">Centrais da equipe</h2>
-      <ul className="mt-3 divide-y divide-stone-200 rounded-xl border border-stone-200 bg-white">
-        {outrasCentrais.map((evento) => <li key={evento.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
-          <div><p className="font-bold">{evento.nome}</p><p className="text-sm text-stone-600">{evento.data.split("-").reverse().join("/")} · {statusEvento[evento.status]}</p></div>
-          <Link href={`/eventos/${evento.id}/supervisao-equipe`} className="operation-secondary">Abrir Central da Equipe</Link>
-        </li>)}
-      </ul>
-    </section>}
+    {outrasOperacoes.length > 0 && <CentraisEquipe eventos={outrasOperacoes} encerradas={false} />}
+    {encerradas.length > 0 && <CentraisEquipe eventos={encerradas} encerradas />}
   </PainelShell>;
 }
